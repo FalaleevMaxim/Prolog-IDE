@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.*?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.text.Font?>
+<?import prolog.devices.ErrorsOutputDevice?>
+<?import prolog.devices.ProgramInputDevice?>
+<?import prolog.devices.ProgramOutputDevice?>
+<VBox fx:id="root" fx:controller="prolog.Controller" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="400.0" prefWidth="600.0" xmlns="http://javafx.com/javafx/8" xmlns:fx="http://javafx.com/fxml/1">
+   <children>
+       <MenuBar>
+         <menus>
+            <Menu id="fileMenu" mnemonicParsing="false" text="File">
+              <items>
+                  <MenuItem id="newFileMenu" mnemonicParsing="false" text="New file" onAction="#newFile"/>
+                <MenuItem id="loadFileMenu" mnemonicParsing="false" text="Load" onAction="#loadFile"/>
+                  <MenuItem id="saveFileMenu" mnemonicParsing="false" text="Save" onAction="#onSaveAction"/>
+                  <MenuItem id="saveAsFileMenu" mnemonicParsing="false" text="Save as" onAction="#onSaveAsAction"/>
+              </items>
+            </Menu>
+         </menus></MenuBar>
+      <HBox alignment="CENTER" prefHeight="36.0" prefWidth="600.0" VBox.vgrow="NEVER">
+         <children>
+            <Button id="runBtn" fx:id="runBtn" mnemonicParsing="false" onMouseClicked="#onRunKeyPressed" text="Run" textFill="#06c61d">
+               <font>
+                  <Font name="System Bold" size="12.0" />
+               </font>
+               <HBox.margin>
+                  <Insets right="10.0" />
+               </HBox.margin>
+            </Button>
+            <Button id="debugBtn" fx:id="debugBtn" mnemonicParsing="false" onMouseClicked="#onDebugKeyPressed" text="Debug" textFill="#15c615">
+               <font>
+                  <Font name="System Bold" size="12.0" />
+               </font>
+               <HBox.margin>
+                  <Insets right="10.0" />
+               </HBox.margin>
+            </Button>
+            <Button id="stopBtn" fx:id="stopBtn" disable="true" mnemonicParsing="false" onMouseClicked="#onStopKeyPressed" text="Stop" textFill="#bf0404">
+               <font>
+                  <Font name="System Bold" size="12.0" />
+               </font>
+               <HBox.margin>
+                  <Insets right="10.0" />
+               </HBox.margin>
+            </Button>
+         </children>
+      </HBox>
+      <HBox prefHeight="117.0" prefWidth="600.0" VBox.vgrow="ALWAYS">
+         <children>
+            <TextArea id="codeArea" fx:id="codeArea" prefHeight="364.0" prefWidth="368.0" promptText="Write code here" HBox.hgrow="ALWAYS">
+               <HBox.margin>
+                  <Insets bottom="2.0" left="2.0" right="2.0" top="2.0" />
+               </HBox.margin>
+            </TextArea>
+            <VBox prefHeight="200.0" prefWidth="100.0" HBox.hgrow="ALWAYS">
+               <children>
+                  <ProgramOutputDevice id="output" fx:id="programOutput" editable="false" focusTraversable="false" prefHeight="200.0" prefWidth="200.0" promptText="Program output" VBox.vgrow="ALWAYS">
+                     <VBox.margin>
+                        <Insets bottom="2.0" />
+                     </VBox.margin></ProgramOutputDevice>
+                  <ProgramInputDevice id="input" fx:id="programInput" disable="true" promptText="Program input">
+                     <padding>
+                        <Insets bottom="2.0" />
+                     </padding></ProgramInputDevice>
+               </children>
+            </VBox>
+         </children>
+      </HBox>
+      <ErrorsOutputDevice id="errors" fx:id="errorsOutput" editable="false" focusTraversable="false" prefHeight="150.0" prefWidth="600.0" promptText="Build and errors">
+         <padding>
+            <Insets top="2.0" />
+         </padding></ErrorsOutputDevice>
+       <Label fx:id="caretPos"/>
+   </children>
+</VBox>
