@@ -15,9 +15,12 @@ public class ProgramInputDevice extends TextField implements InputDevice {
     private volatile State state = State.DISABLED;
     private volatile char charPressed;
     private volatile String lineEntered;
-    private volatile boolean escPressed = false;
     private final Object waitLock = new Object();
+    private InputListener listener;
 
+    public void setListener(InputListener listener) {
+        this.listener = listener;
+    }
 
     {
         setOnKeyTyped(event -> {
@@ -66,6 +69,7 @@ public class ProgramInputDevice extends TextField implements InputDevice {
         }
         String ret = lineEntered;
         lineEntered = null;
+        if(listener!=null) listener.onReadString(ret);
         return ret;
     }
 
@@ -85,6 +89,12 @@ public class ProgramInputDevice extends TextField implements InputDevice {
             state = State.DISABLED;
             clear();
         }
+        if(listener!=null) listener.onReadChar(charPressed);
         return charPressed;
+    }
+
+    public interface InputListener{
+        void onReadChar(char c);
+        void onReadString(String s);
     }
 }

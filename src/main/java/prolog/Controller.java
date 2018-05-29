@@ -40,6 +40,7 @@ public class Controller implements Initializable{
     private boolean fileSaved = true;
     private ProgramContext programContext;
     private Thread programThread;
+    private ThreadGroup programThreadGroup;
 
     public File getFile(){
         if(!fileSaved) saveFile();
@@ -140,7 +141,12 @@ public class Controller implements Initializable{
         });
         programRunning();
         programContext = program.fix().createContext();
-        programThread = new Thread(() -> programContext.execute());
+        if(programThreadGroup==null) programThreadGroup = new ThreadGroup("program");
+        programThread = new Thread(programThreadGroup, () -> programContext.execute());
+        programThread.setUncaughtExceptionHandler((thread, throwable) -> {
+            errorsOutput.runtimeException(new RuntimeException("Error in program thread", throwable));
+            programStopped();
+        });
         programThread.start();
     }
 
@@ -218,6 +224,17 @@ public class Controller implements Initializable{
         codeArea.caretPositionProperty().addListener((observable, oldValue, newValue) -> {
             int pos = newValue.intValue();
             updateCaretPos(pos);
+        });
+        programInput.setListener(new ProgramInputDevice.InputListener() {
+            @Override
+            public void onReadChar(char c) {
+                if(programContext!=null) programContext.getOutputDevices().println(String.valueOf(c));
+            }
+
+            @Override
+            public void onReadString(String s) {
+                if(programContext!=null) programContext.getOutputDevices().println(s);
+            }
         });
     }
 
