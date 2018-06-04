@@ -35,7 +35,6 @@ public class Main extends Application {
 
         List<String> args = getParameters().getRaw();
         if(args.size()>0){
-
             File file = new File(args.get(0));
             c.setFile(file);
             primaryStage.setTitle(file.getPath());

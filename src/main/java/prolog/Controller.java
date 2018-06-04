@@ -140,7 +140,7 @@ public class Controller implements Initializable{
             return ctx;
         });
         programRunning();
-        programContext = program.fix().createContext();
+        programContext = ((Program)program.fix()).createContext();
         if(programThreadGroup==null) programThreadGroup = new ThreadGroup("program");
         programThread = new Thread(programThreadGroup, () -> programContext.execute());
         programThread.setUncaughtExceptionHandler((thread, throwable) -> {
