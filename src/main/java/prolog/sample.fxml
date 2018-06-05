@@ -48,31 +48,36 @@
             </Button>
          </children>
       </HBox>
-      <HBox prefHeight="117.0" prefWidth="600.0" VBox.vgrow="ALWAYS">
-         <children>
-            <TextArea id="codeArea" fx:id="codeArea" prefHeight="364.0" prefWidth="368.0" promptText="Write code here" HBox.hgrow="ALWAYS">
-               <HBox.margin>
-                  <Insets bottom="2.0" left="2.0" right="2.0" top="2.0" />
-               </HBox.margin>
-            </TextArea>
-            <VBox prefHeight="200.0" prefWidth="100.0" HBox.hgrow="ALWAYS">
-               <children>
-                  <ProgramOutputDevice id="output" fx:id="programOutput" editable="false" focusTraversable="false" prefHeight="200.0" prefWidth="200.0" promptText="Program output" VBox.vgrow="ALWAYS">
-                     <VBox.margin>
-                        <Insets bottom="2.0" />
-                     </VBox.margin></ProgramOutputDevice>
-                  <ProgramInputDevice id="input" fx:id="programInput" disable="true" promptText="Program input">
-                     <padding>
-                        <Insets bottom="2.0" />
-                     </padding></ProgramInputDevice>
-               </children>
-            </VBox>
-         </children>
-      </HBox>
-      <ErrorsOutputDevice id="errors" fx:id="errorsOutput" editable="false" focusTraversable="false" prefHeight="150.0" prefWidth="600.0" promptText="Build and errors">
-         <padding>
-            <Insets top="2.0" />
-         </padding></ErrorsOutputDevice>
+      <SplitPane dividerPositions="0.7" orientation="VERTICAL" VBox.vgrow="ALWAYS">
+         <items>
+            <SplitPane dividerPositions="0.6" prefHeight="117.0" prefWidth="600.0" VBox.vgrow="ALWAYS">
+               <items>
+                  <TextArea id="codeArea" fx:id="codeArea" prefHeight="364.0" prefWidth="368.0" promptText="Write code here" HBox.hgrow="ALWAYS">
+                     <HBox.margin>
+                        <Insets bottom="2.0" left="2.0" right="2.0" top="2.0" />
+                     </HBox.margin>
+                  </TextArea>
+                  <VBox prefHeight="200.0" prefWidth="100.0" HBox.hgrow="ALWAYS">
+                     <children>
+                        <ProgramOutputDevice id="output" fx:id="programOutput" editable="false" focusTraversable="false" prefHeight="200.0" prefWidth="200.0" promptText="Program output" VBox.vgrow="ALWAYS">
+                           <VBox.margin>
+                              <Insets bottom="2.0" />
+                           </VBox.margin></ProgramOutputDevice>
+                        <ProgramInputDevice id="input" fx:id="programInput" disable="true" promptText="Program input">
+                           <padding>
+                              <Insets bottom="2.0" />
+                           </padding></ProgramInputDevice>
+                     </children>
+                  </VBox>
+               </items>
+            </SplitPane>
+            <ErrorsOutputDevice id="errors" fx:id="errorsOutput" editable="false" focusTraversable="false" prefHeight="150.0" prefWidth="600.0" promptText="Build and errors">
+               <padding>
+                  <Insets top="2.0" />
+               </padding>
+            </ErrorsOutputDevice>
+         </items>
+      </SplitPane>
        <Label fx:id="caretPos"/>
    </children>
 </VBox>

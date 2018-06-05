@@ -1,5 +1,6 @@
 package prolog;
 
+import javafx.application.Platform;
 import javafx.event.ActionEvent;
 import javafx.fxml.Initializable;
 import javafx.scene.control.*;
@@ -153,7 +154,11 @@ public class Controller implements Initializable{
         if(programThreadGroup==null) programThreadGroup = new ThreadGroup("program");
         programThread = new Thread(programThreadGroup, () -> programContext.execute());
         programThread.setUncaughtExceptionHandler((thread, throwable) -> {
-            errorsOutput.runtimeException(new RuntimeException("Error in program thread", throwable));
+            if(throwable instanceof StackOverflowError) {
+                Platform.runLater(() -> errorsOutput.println("Stack overflow error!"));
+            }else{
+                Platform.runLater(() -> errorsOutput.runtimeException(new RuntimeException("Error in program thread", throwable)));
+            }
             programStopped();
         });
         errorsOutput.println("Program running!");
@@ -203,7 +208,7 @@ public class Controller implements Initializable{
         runBtn.setDisable(false);
         debugBtn.setDisable(false);
         stopBtn.setDisable(true);
-        errorsOutput.println("Program finished.");
+        errorsOutput.println("Program finished. ");
     }
 
     private boolean requestFileName(){

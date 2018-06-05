@@ -1,9 +1,12 @@
 package prolog.devices;
 
 import javafx.scene.control.TextField;
+import javafx.scene.input.KeyCode;
 import ru.prolog.util.io.InputDevice;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 public class ProgramInputDevice extends TextField implements InputDevice {
     private enum State{
@@ -17,12 +20,29 @@ public class ProgramInputDevice extends TextField implements InputDevice {
     private volatile String lineEntered;
     private final Object waitLock = new Object();
     private InputListener listener;
+    private List<String> inputs = new ArrayList<>();
+    private int currInput = -1;
 
     public void setListener(InputListener listener) {
         this.listener = listener;
     }
 
     {
+        setOnKeyPressed(event -> {
+            if(KeyCode.UP.equals(event.getCode())){
+                if(currInput<inputs.size()-1){
+                    currInput++;
+                    setText(inputs.get(currInput));
+                }
+            }
+            if(KeyCode.DOWN.equals(event.getCode())){
+                if(currInput>=0 && inputs.size()>0){
+                    currInput--;
+                    if(currInput==-1) setText("");
+                    else setText(inputs.get(currInput));
+                }
+            }
+        });
         setOnKeyTyped(event -> {
             char c = event.getCharacter().charAt(0);
             if(c ==27){//escape
@@ -41,6 +61,9 @@ public class ProgramInputDevice extends TextField implements InputDevice {
             }
             if(state==State.WAIT_LINE && (c =='\r' || c=='\n')){//enter
                 lineEntered = getText();
+                if(inputs.isEmpty() || !inputs.get(0).equals(lineEntered))
+                    inputs.add(0, lineEntered);
+                currInput=-1;
                 synchronized (waitLock) {
                     waitLock.notifyAll();
                 }
