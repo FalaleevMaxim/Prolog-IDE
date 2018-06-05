@@ -92,15 +92,20 @@ public class Controller implements Initializable{
         if(f==null) return;
         PrologCompiler compiler = new PrologCompiler(f.getAbsolutePath(), debugFile);
         Program program;
+        errorsOutput.clear();
+        programOutput.clear();
+
+        errorsOutput.println("Start compiling...");
         try {
             program = compiler.compileProgram();
         } catch (IOException e) {
             alertReadError(e);
             return;
         }
+
         if(!compiler.getExceptions().isEmpty()){
             for (CompileException e : compiler.getExceptions()) {
-                errorsOutput.runtimeException(e);
+                errorsOutput.println(e.toString());
             }
             for (CompileException e : compiler.getExceptions()) {
                 if(e.getInterval()==null) continue;
@@ -110,10 +115,11 @@ public class Controller implements Initializable{
             return;
         }
 
+        errorsOutput.println("Compile finished. Validating model...");
         Collection<ModelStateException> exceptions = program.exceptions();
         if(!exceptions.isEmpty()){
             for (ModelStateException e : exceptions) {
-                errorsOutput.runtimeException(e);
+                errorsOutput.println(e.toString());
             }
             for (ModelStateException e : exceptions) {
                 if(e.getInterval()==null) continue;
@@ -123,6 +129,7 @@ public class Controller implements Initializable{
             return;
         }
 
+        errorsOutput.println("Validating complete. Prepare for launch...");
         program.managers().getProgramManager().addOption(ctx->new BaseProgramContextDecorator(ctx) {
             @Override
             public boolean execute() {
@@ -139,6 +146,8 @@ public class Controller implements Initializable{
             ctx.setInputDevice(programInput);
             return ctx;
         });
+
+        errorsOutput.println("Creating thread...");
         programRunning();
         programContext = ((Program)program.fix()).createContext();
         if(programThreadGroup==null) programThreadGroup = new ThreadGroup("program");
@@ -147,6 +156,7 @@ public class Controller implements Initializable{
             errorsOutput.runtimeException(new RuntimeException("Error in program thread", throwable));
             programStopped();
         });
+        errorsOutput.println("Program running!");
         programThread.start();
     }
 
@@ -193,6 +203,7 @@ public class Controller implements Initializable{
         runBtn.setDisable(false);
         debugBtn.setDisable(false);
         stopBtn.setDisable(true);
+        errorsOutput.println("Program finished.");
     }
 
     private boolean requestFileName(){
@@ -210,6 +221,17 @@ public class Controller implements Initializable{
                 chooser.showSaveDialog(root.getScene().getWindow()):
                 chooser.showOpenDialog(root.getScene().getWindow());
         if(f!=null){
+            if(!f.exists()) {
+                try {
+                    f.createNewFile();
+                } catch (IOException e) {
+                    Alert alert = new Alert(Alert.AlertType.ERROR);
+                    alert.setHeaderText("Error creating file");
+                    alert.getDialogPane().setExpandableContent(new ScrollPane(new TextArea(e.toString())));
+                    alert.showAndWait();
+                    return false;
+                }
+            }
             file = f;
             ((Stage)root.getScene().getWindow()).setTitle(f.getName());
             return true;
@@ -274,7 +296,7 @@ public class Controller implements Initializable{
         try {
             byte[] encoded = Files.readAllBytes(file.toPath());
             codeArea.setText(new String(encoded, Charset.forName("UTF-8")));
-            fileSaved = true;
+            setFileSaved(true);
         } catch (IOException e) {
             alertReadError(e);
         }
