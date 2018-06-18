@@ -15,13 +15,13 @@ public class ErrorsOutputDevice extends ProgramOutputDevice implements ErrorList
     }
 
     @Override
-    public void prologRuntimeException(PrologRuntimeException e) {
+    public synchronized void prologRuntimeException(PrologRuntimeException e) {
         appendText(e.toString());
         appendText("\n\n");
     }
 
     @Override
-    public void runtimeException(RuntimeException e) {
+    public synchronized void runtimeException(RuntimeException e) {
         StringWriter writer = new StringWriter();
         e.printStackTrace(new PrintWriter(writer));
         appendText(writer.toString());

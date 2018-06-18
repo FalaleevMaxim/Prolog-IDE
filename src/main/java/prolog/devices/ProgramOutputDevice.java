@@ -13,12 +13,12 @@ public class ProgramOutputDevice extends TextArea implements OutputDevice {
     }
 
     @Override
-    public void print(String s) {
+    public synchronized void print(String s) {
         appendText(s);
     }
 
     @Override
-    public void println(String s) {
+    public synchronized void println(String s) {
         appendText(s);
         appendText("\n");
     }

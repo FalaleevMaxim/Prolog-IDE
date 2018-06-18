@@ -36,12 +36,17 @@ public class Controller implements Initializable{
     public VBox root;
     public ErrorsOutputDevice errorsOutput;
     public Label caretPos;
+    public MenuItem runMenuItem;
+    public MenuItem debugMenuItem;
+    public MenuItem stopMenuItem;
+    public TextField stackSizeTF;
 
     private File file;
     private boolean fileSaved = true;
     private ProgramContext programContext;
     private Thread programThread;
     private ThreadGroup programThreadGroup;
+    private volatile boolean running = false;
 
     public File getFile(){
         if(!fileSaved) saveFile();
@@ -84,11 +89,16 @@ public class Controller implements Initializable{
         run();
     }
 
+    public void onDebugKeyPressed(MouseEvent mouseEvent) {
+        debug();
+    }
+
     private void run(){
         run(null);
     }
 
     private void run(String debugFile) {
+        if(running) return;
         File f = getFile();
         if(f==null) return;
         PrologCompiler compiler = new PrologCompiler(f.getAbsolutePath(), debugFile);
@@ -152,7 +162,7 @@ public class Controller implements Initializable{
         programRunning();
         programContext = ((Program)program.fix()).createContext();
         if(programThreadGroup==null) programThreadGroup = new ThreadGroup("program");
-        programThread = new Thread(programThreadGroup, () -> programContext.execute());
+        programThread = new Thread(programThreadGroup, () -> programContext.execute(), "program", Integer.valueOf(stackSizeTF.getText())*1024);
         programThread.setUncaughtExceptionHandler((thread, throwable) -> {
             if(throwable instanceof StackOverflowError) {
                 Platform.runLater(() -> errorsOutput.println("Stack overflow error!"));
@@ -165,7 +175,8 @@ public class Controller implements Initializable{
         programThread.start();
     }
 
-    public void onDebugKeyPressed(MouseEvent mouseEvent) {
+    private void debug() {
+        if(running) return;
         FileChooser chooser = new FileChooser();
         chooser.setInitialDirectory(Paths.get("").toAbsolutePath().toFile());
         chooser.getExtensionFilters().addAll(
@@ -177,6 +188,11 @@ public class Controller implements Initializable{
     }
 
     public void onStopKeyPressed(MouseEvent mouseEvent) {
+        stop();
+    }
+
+    private void stop() {
+        errorsOutput.println("Terminating program...");
         programThread.interrupt();
     }
 
@@ -198,9 +214,13 @@ public class Controller implements Initializable{
     }
 
     private void programRunning(){
+        running = true;
         runBtn.setDisable(true);
         debugBtn.setDisable(true);
         stopBtn.setDisable(false);
+        runMenuItem.setDisable(true);
+        debugMenuItem.setDisable(true);
+        stopMenuItem.setDisable(false);
     }
 
     private void programStopped(){
@@ -208,7 +228,11 @@ public class Controller implements Initializable{
         runBtn.setDisable(false);
         debugBtn.setDisable(false);
         stopBtn.setDisable(true);
+        runMenuItem.setDisable(false);
+        debugMenuItem.setDisable(false);
+        stopMenuItem.setDisable(true);
         errorsOutput.println("Program finished. ");
+        running = false;
     }
 
     private boolean requestFileName(){
@@ -255,12 +279,19 @@ public class Controller implements Initializable{
         programInput.setListener(new ProgramInputDevice.InputListener() {
             @Override
             public void onReadChar(char c) {
+                if(c==27) return;
                 if(programContext!=null) programContext.getOutputDevices().println(String.valueOf(c));
             }
 
             @Override
             public void onReadString(String s) {
+                if(s==null) return;
                 if(programContext!=null) programContext.getOutputDevices().println(s);
+            }
+        });
+        stackSizeTF.textProperty().addListener((observable, oldValue, newValue) -> {
+            if (!newValue.matches("\\d*") || Integer.valueOf(newValue)<100) {
+                stackSizeTF.setText(oldValue);
             }
         });
     }
@@ -270,7 +301,7 @@ public class Controller implements Initializable{
         text = text.substring(0, pos>text.length()?text.length():pos);
         String[] lines = text.split("\n");
         int line = lines.length;
-        int inLine = lines[lines.length-1].length();
+        int inLine = lines.length==0?0:lines[lines.length-1].length();
         caretPos.setText(Integer.toString(line)+":"+inLine);
     }
 
@@ -307,10 +338,22 @@ public class Controller implements Initializable{
         }
     }
 
+    public void runMenuAction(ActionEvent actionEvent) {
+        run();
+    }
+
+    public void debugMenuAction(ActionEvent actionEvent) {
+        debug();
+    }
+
     private void alertReadError(IOException e) {
         Alert alert = new Alert(Alert.AlertType.ERROR);
         alert.setHeaderText("Error reading file");
         alert.getDialogPane().setExpandableContent(new ScrollPane(new TextArea(e.toString())));
         alert.showAndWait();
+    }
+
+    public void stopMenuAction(ActionEvent actionEvent) {
+        stop();
     }
 }
