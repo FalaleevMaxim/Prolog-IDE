@@ -1,6 +1,7 @@
 package prolog.devices;
 
-import ru.prolog.logic.exceptions.PrologRuntimeException;
+import javafx.application.Platform;
+import ru.prolog.etc.exceptions.runtime.PrologRuntimeException;
 import ru.prolog.util.io.ErrorListener;
 
 import java.io.PrintWriter;
@@ -15,16 +16,15 @@ public class ErrorsOutputDevice extends ProgramOutputDevice implements ErrorList
     }
 
     @Override
-    public synchronized void prologRuntimeException(PrologRuntimeException e) {
-        appendText(e.toString());
-        appendText("\n\n");
+    public void prologRuntimeException(PrologRuntimeException e) {
+        Platform.runLater(() -> appendText(e.toString()+"\n\n"));
+
     }
 
     @Override
-    public synchronized void runtimeException(RuntimeException e) {
+    public void runtimeException(RuntimeException e) {
         StringWriter writer = new StringWriter();
         e.printStackTrace(new PrintWriter(writer));
-        appendText(writer.toString());
-        appendText("\n\n");
+        Platform.runLater(() -> appendText(writer.toString()+"\n\n"));
     }
 }

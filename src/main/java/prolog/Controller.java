@@ -1,6 +1,8 @@
 package prolog;
 
 import javafx.application.Platform;
+import javafx.concurrent.Service;
+import javafx.concurrent.Task;
 import javafx.event.ActionEvent;
 import javafx.fxml.Initializable;
 import javafx.scene.control.*;
@@ -13,10 +15,13 @@ import prolog.devices.ProgramInputDevice;
 import prolog.devices.ProgramOutputDevice;
 import ru.prolog.compiler.CompileException;
 import ru.prolog.compiler.PrologCompiler;
-import ru.prolog.logic.context.program.BaseProgramContextDecorator;
-import ru.prolog.logic.context.program.ProgramContext;
-import ru.prolog.logic.model.exceptions.ModelStateException;
-import ru.prolog.logic.model.program.Program;
+import ru.prolog.etc.exceptions.model.ModelStateException;
+import ru.prolog.etc.exceptions.runtime.PrologRuntimeException;
+import ru.prolog.model.program.Program;
+import ru.prolog.runtime.context.program.BaseProgramContextDecorator;
+import ru.prolog.runtime.context.program.ProgramContext;
+import ru.prolog.util.io.ErrorListener;
+import ru.prolog.util.io.OutputDevice;
 
 import java.io.*;
 import java.net.URL;
@@ -47,6 +52,7 @@ public class Controller implements Initializable{
     private Thread programThread;
     private ThreadGroup programThreadGroup;
     private volatile boolean running = false;
+    private Service<Boolean> programRunService;
 
     public File getFile(){
         if(!fileSaved) saveFile();
@@ -161,18 +167,38 @@ public class Controller implements Initializable{
         errorsOutput.println("Creating thread...");
         programRunning();
         programContext = ((Program)program.fix()).createContext();
-        if(programThreadGroup==null) programThreadGroup = new ThreadGroup("program");
-        programThread = new Thread(programThreadGroup, () -> programContext.execute(), "program", Integer.valueOf(stackSizeTF.getText())*1024);
-        programThread.setUncaughtExceptionHandler((thread, throwable) -> {
-            if(throwable instanceof StackOverflowError) {
-                Platform.runLater(() -> errorsOutput.println("Stack overflow error!"));
-            }else{
-                Platform.runLater(() -> errorsOutput.runtimeException(new RuntimeException("Error in program thread", throwable)));
+        programRunService = new Service<Boolean>() {
+            @Override
+            protected Task<Boolean> createTask() {
+                return new Task<Boolean>() {
+                    @Override
+                    protected Boolean call() {
+
+                        return programContext.execute();
+                    }
+                };
+            }
+        };
+
+        programRunService.setOnRunning(event -> errorsOutput.println("Program running!"));
+        programRunService.setOnFailed(event -> {
+            Throwable exception = event.getSource().getException();
+            if(exception instanceof StackOverflowError) {
+                errorsOutput.println("Stack overflow error!");
+            } else {
+                errorsOutput.runtimeException(new RuntimeException("Error in program thread", exception));
             }
             programStopped();
         });
-        errorsOutput.println("Program running!");
-        programThread.start();
+        programRunService.setOnSucceeded(event -> {
+                errorsOutput.println("Program finished with result" + event.getSource().getValue());
+                programStopped();
+        });
+        programRunService.setOnCancelled(event -> {
+            errorsOutput.println("Program terminated.");
+            programStopped();
+        });
+        programRunService.start();
     }
 
     private void debug() {
@@ -193,7 +219,7 @@ public class Controller implements Initializable{
 
     private void stop() {
         errorsOutput.println("Terminating program...");
-        programThread.interrupt();
+        programRunService.cancel();
     }
 
     public boolean saveFile(){

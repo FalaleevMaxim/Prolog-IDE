@@ -1,5 +1,6 @@
 package prolog.devices;
 
+import javafx.application.Platform;
 import ru.prolog.util.io.OutputDevice;
 
 import javafx.scene.control.TextArea;
@@ -13,13 +14,13 @@ public class ProgramOutputDevice extends TextArea implements OutputDevice {
     }
 
     @Override
-    public synchronized void print(String s) {
-        appendText(s);
+    public void print(String s) {
+        Platform.runLater(() -> appendText(s));
+
     }
 
     @Override
-    public synchronized void println(String s) {
-        appendText(s);
-        appendText("\n");
+    public void println(String s) {
+        Platform.runLater(() -> appendText(s + "\n"));
     }
 }
