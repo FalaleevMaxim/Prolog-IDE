@@ -191,7 +191,7 @@ public class Controller implements Initializable{
             programStopped();
         });
         programRunService.setOnSucceeded(event -> {
-                errorsOutput.println("Program finished with result" + event.getSource().getValue());
+                errorsOutput.println("Program finished with result: " + event.getSource().getValue());
                 programStopped();
         });
         programRunService.setOnCancelled(event -> {

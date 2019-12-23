@@ -70,7 +70,7 @@
     <SplitPane dividerPositions="0.7" orientation="VERTICAL" VBox.vgrow="ALWAYS">
         <SplitPane dividerPositions="0.6" prefHeight="117.0" prefWidth="600.0" VBox.vgrow="ALWAYS">
             <TextArea id="codeArea" fx:id="codeArea" prefHeight="364.0" prefWidth="368.0"
-                      promptText="Write code here" HBox.hgrow="ALWAYS">
+                      promptText="Write code here" HBox.hgrow="ALWAYS" style="-fx-font-family: monospace; -fx-font-size: 16">
                 <HBox.margin>
                     <Insets bottom="2.0" left="2.0" right="2.0" top="2.0"/>
                 </HBox.margin>
