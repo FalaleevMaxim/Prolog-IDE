@@ -1,0 +1,54 @@
+.header {
+    -fx-fill: purple;
+    -fx-font-weight: bold;
+}
+
+.sbracket {
+    -fx-fill: darkgreen;
+    -fx-font-weight: bold;
+}
+
+.bracket {
+    -fx-fill: firebrick;
+    -fx-font-weight: bold;
+}
+
+.rule_sep {
+    -fx-fill: firebrick;
+    -fx-font-weight: bold;
+}
+
+.math {
+    -fx-fill: firebrick;
+    -fx-font-weight: bold;
+}
+
+.string {
+    -fx-fill: blue;
+}
+
+.comment {
+    -fx-fill: cadetblue;
+}
+
+.unknown {
+    -fx-fill: red;
+    -fx-background-color: Bisque;
+}
+
+.number {
+    -fx-fill: cyan;
+}
+
+.anonymous {
+    -fx-fill: grey;
+    -fx-font-weight: bold;
+}
+
+.error {
+    -rtfx-background-color: #f0f0f0;
+    -rtfx-underline-color: red;
+    -rtfx-underline-dash-array: 2 2;
+    -rtfx-underline-width: 1;
+    -rtfx-underline-cap: butt;
+}

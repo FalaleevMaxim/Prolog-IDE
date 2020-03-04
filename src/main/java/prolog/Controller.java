@@ -5,11 +5,22 @@ import javafx.concurrent.Service;
 import javafx.concurrent.Task;
 import javafx.event.ActionEvent;
 import javafx.fxml.Initializable;
+import javafx.geometry.Point2D;
 import javafx.scene.control.*;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
+import javafx.stage.Popup;
 import javafx.stage.Stage;
+import org.fxmisc.richtext.CodeArea;
+import org.fxmisc.richtext.LineNumberFactory;
+import org.fxmisc.richtext.event.MouseOverTextEvent;
+import org.fxmisc.richtext.model.StyleSpan;
+import org.fxmisc.richtext.model.StyleSpans;
+import org.fxmisc.richtext.model.StyleSpansBuilder;
+import org.reactfx.Subscription;
 import prolog.devices.ErrorsOutputDevice;
 import prolog.devices.ProgramInputDevice;
 import prolog.devices.ProgramOutputDevice;
@@ -20,6 +31,9 @@ import ru.prolog.etc.exceptions.runtime.PrologRuntimeException;
 import ru.prolog.model.program.Program;
 import ru.prolog.runtime.context.program.BaseProgramContextDecorator;
 import ru.prolog.runtime.context.program.ProgramContext;
+import ru.prolog.syntaxmodel.recognizers.Lexer;
+import ru.prolog.syntaxmodel.source.UnmodifiableStringSourceCode;
+import ru.prolog.syntaxmodel.tree.Token;
 import ru.prolog.util.io.ErrorListener;
 import ru.prolog.util.io.OutputDevice;
 
@@ -28,13 +42,15 @@ import java.net.URL;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.Collection;
-import java.util.ResourceBundle;
+import java.time.Duration;
+import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class Controller implements Initializable{
     public ProgramInputDevice programInput;
     public ProgramOutputDevice programOutput;
-    public TextArea codeArea;
+    public CodeArea codeArea;
     public Button stopBtn;
     public Button debugBtn;
     public Button runBtn;
@@ -53,6 +69,7 @@ public class Controller implements Initializable{
     private ThreadGroup programThreadGroup;
     private volatile boolean running = false;
     private Service<Boolean> programRunService;
+    private Map<Integer, Token> errorTokens = new HashMap<>();
 
     public File getFile(){
         if(!fileSaved) saveFile();
@@ -66,7 +83,7 @@ public class Controller implements Initializable{
         this.file = file;
         try {
             byte[] encoded = Files.readAllBytes(file.toPath());
-            codeArea.setText(new String(encoded, Charset.forName("UTF-8")));
+            codeArea.replaceText(new String(encoded, Charset.forName("UTF-8")));
             fileSaved = true;
         } catch (IOException e) {
             alertReadError(e);
@@ -302,6 +319,61 @@ public class Controller implements Initializable{
             int pos = newValue.intValue();
             updateCaretPos(pos);
         });
+        codeArea.setParagraphGraphicFactory(LineNumberFactory.get(codeArea));
+        final Pattern whiteSpace = Pattern.compile( "^\\s+" );
+        codeArea.addEventHandler( KeyEvent.KEY_PRESSED, KE ->
+        {
+            if ( KE.getCode() == KeyCode.ENTER ) {
+                int caretPosition = codeArea.getCaretPosition();
+                int currentParagraph = codeArea.getCurrentParagraph();
+                Matcher m0 = whiteSpace.matcher( codeArea.getParagraph( currentParagraph-1 ).getSegments().get( 0 ) );
+                if ( m0.find() ) Platform.runLater( () -> codeArea.insertText( caretPosition, m0.group() ) );
+            }
+        });
+        Subscription cleanupWhenNoLongerNeedIt = codeArea
+
+                // plain changes = ignore style changes that are emitted when syntax highlighting is reapplied
+                // multi plain changes = save computation by not rerunning the code multiple times
+                //   when making multiple changes (e.g. renaming a method at multiple parts in file)
+                .multiPlainChanges()
+
+                // do not emit an event until 500 ms have passed since the last emission of previous stream
+                .successionEnds(Duration.ofMillis(500))
+
+                // run the following code block when previous stream emits an event
+                .subscribe(ignore -> codeArea.setStyleSpans(0, computeHighlighting(codeArea.getText())));
+        codeArea.getStylesheets().add(getClass().getResource("/editor.css").toExternalForm());
+
+        Popup popup = new Popup();
+        Label popupMsg = new Label();
+        popupMsg.setStyle(
+                "-fx-background-color: grey;" +
+                "-fx-text-fill: darkred;" +
+                "-fx-padding: 5;");
+        popup.getContent().add(popupMsg);
+
+        codeArea.setMouseOverTextDelay(Duration.ofSeconds(1));
+        codeArea.addEventHandler(MouseOverTextEvent.MOUSE_OVER_TEXT_BEGIN, e -> {
+            if(errorTokens.isEmpty()) return;
+            int chIdx  = e.getCharacterIndex();
+            Point2D pos = e.getScreenPosition();
+            Token token = null;
+            for (Map.Entry<Integer, Token> tokenPos : errorTokens.entrySet()) {
+                if(tokenPos.getKey() > chIdx) continue;
+                int dist = chIdx - tokenPos.getKey();
+                if(dist <= tokenPos.getValue().length()) {
+                    token = tokenPos.getValue();
+                    break;
+                }
+            }
+            if(token == null) return;
+            popupMsg.setText(token.getHint().errorText);
+            popup.show(codeArea, pos.getX(), pos.getY() + 10);
+        });
+        codeArea.addEventHandler(MouseOverTextEvent.MOUSE_OVER_TEXT_END, e -> {
+            popup.hide();
+        });
+
         programInput.setListener(new ProgramInputDevice.InputListener() {
             @Override
             public void onReadChar(char c) {
@@ -357,7 +429,7 @@ public class Controller implements Initializable{
         if(!requestFileName(false)) return;
         try {
             byte[] encoded = Files.readAllBytes(file.toPath());
-            codeArea.setText(new String(encoded, Charset.forName("UTF-8")));
+            codeArea.replaceText(new String(encoded, Charset.forName("UTF-8")));
             setFileSaved(true);
         } catch (IOException e) {
             alertReadError(e);
@@ -381,5 +453,96 @@ public class Controller implements Initializable{
 
     public void stopMenuAction(ActionEvent actionEvent) {
         stop();
+    }
+
+    private StyleSpans<Collection<String>> computeHighlighting(String text) {
+        errorTokens.clear();
+        Lexer lexer = new Lexer(new UnmodifiableStringSourceCode(text), text);
+        StyleSpansBuilder<Collection<String>> spansBuilder = new StyleSpansBuilder<>();
+        int tokensLength = 0;
+        while (true){
+            Token token = lexer.nextToken();
+            if(token == null) break;
+            if(token.getTokenType() == null) {
+                addSpan(spansBuilder, token, "unknown", tokensLength);
+            } else {
+                switch (token.getTokenType()) {
+                    case LB:
+                    case RB:
+                        addSpan(spansBuilder, token, "bracket", tokensLength);
+                        break;
+                    case RSQB:
+                    case LSQB:
+                    case TAILSEP:
+                        addSpan(spansBuilder, token, "sbracket", tokensLength);
+                        break;
+                    case DOT:
+                    case COMMA:
+                    case SEMICOLON:
+                    case IF_SIGN:
+                    case IF_KEYWORD:
+                    case AND_KEYWORD:
+                    case OR_KEYWORD:
+                        addSpan(spansBuilder, token, "rule_sep", tokensLength);
+                        break;
+                    case SINGLE_COMMENT:
+                    case MULTILINE_COMMENT:
+                        addSpan(spansBuilder, token, "comment", tokensLength);
+                        break;
+                    case INTEGER:
+                    case REAL:
+                        addSpan(spansBuilder, token, "number", tokensLength);
+                        break;
+                    case STRING:
+                    case CHAR:
+                        addSpan(spansBuilder, token, "string", tokensLength);
+                        break;
+                    case VARIABLE:
+                        addSpan(spansBuilder, token, "variable", tokensLength);
+                        break;
+                    case SYMBOL:
+                    case CUT_SIGN:
+                        addSpan(spansBuilder, token, "name", tokensLength);
+                        break;
+                    case ANONYMOUS:
+                        addSpan(spansBuilder, token, "anonymous", tokensLength);
+                        break;
+                    case DOMAINS_KEYWORD:
+                    case DATABASE_KEYWORD:
+                    case PREDICATES_KEYWORD:
+                    case CLAUSES_KEYWORD:
+                    case GOAL_KEYWORD:
+                        addSpan(spansBuilder, token, "header", tokensLength);
+                        break;
+                    case STAR_MULTIPLY:
+                    case PLUS:
+                    case MINUS:
+                    case DIVIDE:
+                    case GREATER:
+                    case LESSER:
+                    case EQUALS:
+                        addSpan(spansBuilder, token, "math", tokensLength);
+                        break;
+                    default:
+                        spansBuilder.add(Collections.emptyList(), token.length());
+                }
+            }
+            tokensLength += token.length();
+        }
+        if(tokensLength == 0) {
+            spansBuilder.add(Collections.emptyList(), text.length());
+        }
+        return spansBuilder.create();
+    }
+
+    private void addSpan(StyleSpansBuilder<Collection<String>> spansBuilder, Token token, String style, int start) {
+        if(token.isPartial()) {
+            spansBuilder.add(Arrays.asList("error", style), token.length());
+        } else {
+            spansBuilder.add(Collections.singleton(style), token.length());
+        }
+        if(token.getHint()!=null && token.getHint().errorText != null) {
+            errorTokens.put(start, token);
+        }
     }
 }
