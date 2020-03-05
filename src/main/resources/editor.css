@@ -1,5 +1,5 @@
 .header {
-    -fx-fill: purple;
+    -fx-fill: darkblue;
     -fx-font-weight: bold;
 }
 
@@ -24,11 +24,11 @@
 }
 
 .string {
-    -fx-fill: blue;
+    -fx-fill: green;
 }
 
 .comment {
-    -fx-fill: cadetblue;
+    -fx-fill: grey;
 }
 
 .unknown {
@@ -37,7 +37,12 @@
 }
 
 .number {
-    -fx-fill: cyan;
+    -fx-fill: blue;
+}
+
+.variable {
+    -fx-fill: purple;
+    -fx-font-weight: bold;
 }
 
 .anonymous {
