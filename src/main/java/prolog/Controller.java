@@ -17,25 +17,21 @@ import javafx.stage.Stage;
 import org.fxmisc.richtext.CodeArea;
 import org.fxmisc.richtext.LineNumberFactory;
 import org.fxmisc.richtext.event.MouseOverTextEvent;
-import org.fxmisc.richtext.model.StyleSpan;
 import org.fxmisc.richtext.model.StyleSpans;
 import org.fxmisc.richtext.model.StyleSpansBuilder;
 import org.reactfx.Subscription;
 import prolog.devices.ErrorsOutputDevice;
 import prolog.devices.ProgramInputDevice;
 import prolog.devices.ProgramOutputDevice;
+import prolog.util.CodeParseInfo;
 import ru.prolog.compiler.CompileException;
 import ru.prolog.compiler.PrologCompiler;
 import ru.prolog.etc.exceptions.model.ModelStateException;
-import ru.prolog.etc.exceptions.runtime.PrologRuntimeException;
 import ru.prolog.model.program.Program;
 import ru.prolog.runtime.context.program.BaseProgramContextDecorator;
 import ru.prolog.runtime.context.program.ProgramContext;
 import ru.prolog.syntaxmodel.recognizers.Lexer;
-import ru.prolog.syntaxmodel.source.UnmodifiableStringSourceCode;
 import ru.prolog.syntaxmodel.tree.Token;
-import ru.prolog.util.io.ErrorListener;
-import ru.prolog.util.io.OutputDevice;
 
 import java.io.*;
 import java.net.URL;
@@ -70,6 +66,7 @@ public class Controller implements Initializable{
     private volatile boolean running = false;
     private Service<Boolean> programRunService;
     private Map<Integer, Token> errorTokens = new HashMap<>();
+    private final CodeParseInfo codeParseInfo = new CodeParseInfo();
 
     public File getFile(){
         if(!fileSaved) saveFile();
@@ -314,6 +311,7 @@ public class Controller implements Initializable{
     @Override
     public void initialize(URL url, ResourceBundle resourceBundle) {
         codeArea.textProperty().addListener((observableValue, s, s2) -> setFileSaved(false));
+        codeArea.textProperty().addListener((observableValue, s, s2) -> errorTokens.clear());
         codeArea.textProperty().addListener((observableValue, s, s2) -> updateCaretPos(codeArea.getCaretPosition()));
         codeArea.caretPositionProperty().addListener((observable, oldValue, newValue) -> {
             int pos = newValue.intValue();
@@ -457,7 +455,12 @@ public class Controller implements Initializable{
 
     private StyleSpans<Collection<String>> computeHighlighting(String text) {
         errorTokens.clear();
-        Lexer lexer = new Lexer(new UnmodifiableStringSourceCode(text), text);
+        if(text.isEmpty()) return StyleSpans.singleton(Collections.emptyList(), 0);
+
+        Lexer lexer = getLexerForChangedText(text);
+        lexer.setPointer(null);
+        codeParseInfo.setFirstToken(null);
+        codeParseInfo.setLastToken(null);
         StyleSpansBuilder<Collection<String>> spansBuilder = new StyleSpansBuilder<>();
         int tokensLength = 0;
         while (true){
@@ -528,10 +531,13 @@ public class Controller implements Initializable{
                 }
             }
             tokensLength += token.length();
+            if(codeParseInfo.getFirstToken() == null) codeParseInfo.setFirstToken(token);
+            codeParseInfo.setLastToken(token);
         }
         if(tokensLength == 0) {
             spansBuilder.add(Collections.emptyList(), text.length());
         }
+        codeParseInfo.setLastParsedCode(text);
         return spansBuilder.create();
     }
 
@@ -544,5 +550,47 @@ public class Controller implements Initializable{
         if(token.getHint()!=null && token.getHint().errorText != null) {
             errorTokens.put(start, token);
         }
+    }
+
+    private Lexer getLexerForChangedText(String newText) {
+        String oldText = codeParseInfo.getLastParsedCode();
+        if(oldText.isEmpty()) return new Lexer(newText);
+
+        // Индекс первого изменившегося символа в коде (с начала текста)
+        int firstChanged;
+        for (firstChanged = 0; firstChanged < oldText.length() && firstChanged < newText.length(); firstChanged++) {
+            if(oldText.charAt(firstChanged) != newText.charAt(firstChanged)) break;
+        }
+
+        // Индекс последнего изменившегося символа в коде (с конца текста)
+        int lastChanged;
+        for (lastChanged = 0; lastChanged < oldText.length() - firstChanged && lastChanged < newText.length() - firstChanged; lastChanged++) {
+            if(oldText.charAt(oldText.length() - 1 - lastChanged) != newText.charAt(newText.length() - 1 - lastChanged)) break;
+        }
+
+        Token before = codeParseInfo.getFirstToken();
+        if(before != null) {
+            for (int i = 0; i < newText.length(); i += before.length(), before = before.getNext()) {
+                if (i + before.length() >= firstChanged) {
+                    before = before.getPrev();
+                    firstChanged = i;
+                    break;
+                }
+            }
+        }
+
+        Token after = codeParseInfo.getLastToken();
+        if(after != null) {
+            for (int i = 0; i < newText.length(); i += after.length(), after = after.getPrev()) {
+                if (i + after.length() == lastChanged) break;
+                if (i + after.length() >= lastChanged) {
+                    after = after.getNext();
+                    lastChanged = i;
+                    break;
+                }
+            }
+        }
+
+        return new Lexer(newText, before, after, firstChanged, newText.length() - firstChanged - lastChanged);
     }
 }
