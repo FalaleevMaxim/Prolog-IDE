@@ -9,12 +9,20 @@ import java.util.Collection;
  */
 public interface Highlighter {
     /**
+     * Вычисляет подсветку синтаксиса для изменившегося кода в редакторе
+     *
+     * @param text Текст в редакторе
+     * @return Разметка синтаксиса для изменившегося текста
+     */
+    HighlightingResult computeHighlighting(String text);
+
+    /**
      * Вычисляет подсветку синтаксиса для всего кода в редакторе
      *
      * @param text Текст в редакторе
      * @return Разметка синтаксиса для всего текста
      */
-    HighlightingResult computeHighlighting(String text);
+    StyleSpans<Collection<String>> computeHighlightingFull(String text);
 
     /**
      * Получить текст (ошибки) для всплывающего сообщения при наведении на указанную позицию в тексте

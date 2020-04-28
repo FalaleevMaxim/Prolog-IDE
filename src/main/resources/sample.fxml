@@ -4,10 +4,10 @@
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
 <?import javafx.scene.text.Font?>
+<?import org.fxmisc.richtext.CodeArea?>
 <?import prolog.devices.ErrorsOutputDevice?>
 <?import prolog.devices.ProgramInputDevice?>
 <?import prolog.devices.ProgramOutputDevice?>
-<?import org.fxmisc.richtext.CodeArea?>
 <VBox fx:id="root" fx:controller="prolog.Controller" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity"
       minWidth="-Infinity" prefHeight="400.0" prefWidth="600.0" xmlns="http://javafx.com/javafx/8"
       xmlns:fx="http://javafx.com/fxml/1">
@@ -37,6 +37,20 @@
                 </content>
 
             </CustomMenuItem>
+        </Menu>
+        <fx:define>
+            <ToggleGroup fx:id="highlightingToggleGroup"/>
+        </fx:define>
+        <Menu id="highlightingMenu" mnemonicParsing="false" text="Highlighting">
+            <RadioMenuItem text="No highlighting"
+                           fx:id="noHighlightingMenuItem"
+                           toggleGroup="$highlightingToggleGroup"/>
+            <RadioMenuItem text="Use lexer"
+                           fx:id="lexerHighlightingMenuItem"
+                           selected="true"
+                           toggleGroup="$highlightingToggleGroup"/>
+            <SeparatorMenuItem/>
+            <MenuItem id="updateHighlighting" text="Update highlighting" onAction="#updateHighlighting"/>
         </Menu>
     </MenuBar>
     <HBox alignment="CENTER" prefHeight="36.0" prefWidth="600.0" VBox.vgrow="NEVER">

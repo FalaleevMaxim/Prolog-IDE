@@ -119,6 +119,14 @@ public class LexerHighlighting implements Highlighter {
     }
 
     @Override
+    public StyleSpans<Collection<String>> computeHighlightingFull(String text) {
+        lastParsedCode = "";
+        firstToken = null;
+        lastToken = null;
+        return computeHighlighting(text).styleSpans;
+    }
+
+    @Override
     public String getMessageForPos(int pos) {
         Token token = firstToken;
         for (int i = 0; token != null; i += token.length(), token = token.getNext()) {

@@ -23,6 +23,7 @@ import prolog.devices.ProgramInputDevice;
 import prolog.devices.ProgramOutputDevice;
 import prolog.highlighting.Highlighter;
 import prolog.highlighting.LexerHighlighting;
+import prolog.highlighting.NoHighlighting;
 import ru.prolog.compiler.CompileException;
 import ru.prolog.compiler.PrologCompiler;
 import ru.prolog.etc.exceptions.model.ModelStateException;
@@ -54,6 +55,9 @@ public class Controller implements Initializable{
     public MenuItem runMenuItem;
     public MenuItem debugMenuItem;
     public MenuItem stopMenuItem;
+    public ToggleGroup highlightingToggleGroup;
+    public RadioMenuItem noHighlightingMenuItem;
+    public RadioMenuItem lexerHighlightingMenuItem;
     public TextField stackSizeTF;
 
     private File file;
@@ -368,6 +372,15 @@ public class Controller implements Initializable{
             popup.hide();
         });
 
+        highlightingToggleGroup.selectedToggleProperty().addListener((observable, oldValue, newValue) -> {
+            if(newValue == noHighlightingMenuItem) {
+                highlighter = new NoHighlighting();
+            } else if(newValue == lexerHighlightingMenuItem) {
+                highlighter = new LexerHighlighting();
+            }
+            updateHighlighting();
+        });
+
         programInput.setListener(new ProgramInputDevice.InputListener() {
             @Override
             public void onReadChar(char c) {
@@ -386,6 +399,11 @@ public class Controller implements Initializable{
                 stackSizeTF.setText(oldValue);
             }
         });
+    }
+
+    public void updateHighlighting() {
+        codeArea.setStyleSpans(0, highlighter.computeHighlightingFull(codeArea.getText()));
+        textChanged = false;
     }
 
     private void updateCaretPos(int pos) {
