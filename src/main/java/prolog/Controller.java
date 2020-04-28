@@ -17,21 +17,18 @@ import javafx.stage.Stage;
 import org.fxmisc.richtext.CodeArea;
 import org.fxmisc.richtext.LineNumberFactory;
 import org.fxmisc.richtext.event.MouseOverTextEvent;
-import org.fxmisc.richtext.model.StyleSpans;
-import org.fxmisc.richtext.model.StyleSpansBuilder;
 import org.reactfx.Subscription;
 import prolog.devices.ErrorsOutputDevice;
 import prolog.devices.ProgramInputDevice;
 import prolog.devices.ProgramOutputDevice;
-import prolog.util.CodeParseInfo;
+import prolog.highlighting.Highlighter;
+import prolog.highlighting.LexerHighlighting;
 import ru.prolog.compiler.CompileException;
 import ru.prolog.compiler.PrologCompiler;
 import ru.prolog.etc.exceptions.model.ModelStateException;
 import ru.prolog.model.program.Program;
 import ru.prolog.runtime.context.program.BaseProgramContextDecorator;
 import ru.prolog.runtime.context.program.ProgramContext;
-import ru.prolog.syntaxmodel.recognizers.Lexer;
-import ru.prolog.syntaxmodel.tree.Token;
 
 import java.io.*;
 import java.net.URL;
@@ -39,7 +36,8 @@ import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.time.Duration;
-import java.util.*;
+import java.util.Collection;
+import java.util.ResourceBundle;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -65,8 +63,9 @@ public class Controller implements Initializable{
     private ThreadGroup programThreadGroup;
     private volatile boolean running = false;
     private Service<Boolean> programRunService;
-    private Map<Integer, Token> errorTokens = new HashMap<>();
-    private final CodeParseInfo codeParseInfo = new CodeParseInfo();
+    private Highlighter highlighter = new LexerHighlighting();
+    private Subscription updateHighlightSubscription;
+    private volatile boolean textChanged;
 
     public File getFile(){
         if(!fileSaved) saveFile();
@@ -311,7 +310,7 @@ public class Controller implements Initializable{
     @Override
     public void initialize(URL url, ResourceBundle resourceBundle) {
         codeArea.textProperty().addListener((observableValue, s, s2) -> setFileSaved(false));
-        codeArea.textProperty().addListener((observableValue, s, s2) -> errorTokens.clear());
+        codeArea.textProperty().addListener((observableValue, s, s2) -> textChanged = true);
         codeArea.textProperty().addListener((observableValue, s, s2) -> updateCaretPos(codeArea.getCaretPosition()));
         codeArea.caretPositionProperty().addListener((observable, oldValue, newValue) -> {
             int pos = newValue.intValue();
@@ -328,8 +327,8 @@ public class Controller implements Initializable{
                 if ( m0.find() ) Platform.runLater( () -> codeArea.insertText( caretPosition, m0.group() ) );
             }
         });
-        Subscription cleanupWhenNoLongerNeedIt = codeArea
 
+        updateHighlightSubscription = codeArea
                 // plain changes = ignore style changes that are emitted when syntax highlighting is reapplied
                 // multi plain changes = save computation by not rerunning the code multiple times
                 //   when making multiple changes (e.g. renaming a method at multiple parts in file)
@@ -339,7 +338,11 @@ public class Controller implements Initializable{
                 .successionEnds(Duration.ofMillis(500))
 
                 // run the following code block when previous stream emits an event
-                .subscribe(ignore -> codeArea.setStyleSpans(0, computeHighlighting(codeArea.getText())));
+                .subscribe(ignore -> {
+                    Highlighter.HighlightingResult highlightingResult = highlighter.computeHighlighting(codeArea.getText());
+                    codeArea.setStyleSpans(highlightingResult.start, highlightingResult.styleSpans);
+                    textChanged = false;
+                });
         codeArea.getStylesheets().add(getClass().getResource("/editor.css").toExternalForm());
 
         Popup popup = new Popup();
@@ -352,21 +355,14 @@ public class Controller implements Initializable{
 
         codeArea.setMouseOverTextDelay(Duration.ofSeconds(1));
         codeArea.addEventHandler(MouseOverTextEvent.MOUSE_OVER_TEXT_BEGIN, e -> {
-            if(errorTokens.isEmpty()) return;
+            if(textChanged) return;
             int chIdx  = e.getCharacterIndex();
-            Point2D pos = e.getScreenPosition();
-            Token token = null;
-            for (Map.Entry<Integer, Token> tokenPos : errorTokens.entrySet()) {
-                if(tokenPos.getKey() > chIdx) continue;
-                int dist = chIdx - tokenPos.getKey();
-                if(dist <= tokenPos.getValue().length()) {
-                    token = tokenPos.getValue();
-                    break;
-                }
+            String message = highlighter.getMessageForPos(chIdx);
+            if(message != null) {
+                Point2D pos = e.getScreenPosition();
+                popupMsg.setText(message);
+                popup.show(codeArea, pos.getX(), pos.getY() + 10);
             }
-            if(token == null) return;
-            popupMsg.setText(token.getHint().errorText);
-            popup.show(codeArea, pos.getX(), pos.getY() + 10);
         });
         codeArea.addEventHandler(MouseOverTextEvent.MOUSE_OVER_TEXT_END, e -> {
             popup.hide();
@@ -451,146 +447,5 @@ public class Controller implements Initializable{
 
     public void stopMenuAction(ActionEvent actionEvent) {
         stop();
-    }
-
-    private StyleSpans<Collection<String>> computeHighlighting(String text) {
-        errorTokens.clear();
-        if(text.isEmpty()) return StyleSpans.singleton(Collections.emptyList(), 0);
-
-        Lexer lexer = getLexerForChangedText(text);
-        lexer.setPointer(null);
-        codeParseInfo.setFirstToken(null);
-        codeParseInfo.setLastToken(null);
-        StyleSpansBuilder<Collection<String>> spansBuilder = new StyleSpansBuilder<>();
-        int tokensLength = 0;
-        while (true){
-            Token token = lexer.nextToken();
-            if(token == null) break;
-            if(token.getTokenType() == null) {
-                addSpan(spansBuilder, token, "unknown", tokensLength);
-            } else {
-                switch (token.getTokenType()) {
-                    case LB:
-                    case RB:
-                        addSpan(spansBuilder, token, "bracket", tokensLength);
-                        break;
-                    case RSQB:
-                    case LSQB:
-                    case TAILSEP:
-                        addSpan(spansBuilder, token, "sbracket", tokensLength);
-                        break;
-                    case DOT:
-                    case COMMA:
-                    case SEMICOLON:
-                    case IF_SIGN:
-                    case IF_KEYWORD:
-                    case AND_KEYWORD:
-                    case OR_KEYWORD:
-                        addSpan(spansBuilder, token, "rule_sep", tokensLength);
-                        break;
-                    case SINGLE_COMMENT:
-                    case MULTILINE_COMMENT:
-                        addSpan(spansBuilder, token, "comment", tokensLength);
-                        break;
-                    case INTEGER:
-                    case REAL:
-                        addSpan(spansBuilder, token, "number", tokensLength);
-                        break;
-                    case STRING:
-                    case CHAR:
-                        addSpan(spansBuilder, token, "string", tokensLength);
-                        break;
-                    case VARIABLE:
-                        addSpan(spansBuilder, token, "variable", tokensLength);
-                        break;
-                    case SYMBOL:
-                    case CUT_SIGN:
-                        addSpan(spansBuilder, token, "name", tokensLength);
-                        break;
-                    case ANONYMOUS:
-                        addSpan(spansBuilder, token, "anonymous", tokensLength);
-                        break;
-                    case DOMAINS_KEYWORD:
-                    case DATABASE_KEYWORD:
-                    case PREDICATES_KEYWORD:
-                    case CLAUSES_KEYWORD:
-                    case GOAL_KEYWORD:
-                        addSpan(spansBuilder, token, "header", tokensLength);
-                        break;
-                    case STAR_MULTIPLY:
-                    case PLUS:
-                    case MINUS:
-                    case DIVIDE:
-                    case GREATER:
-                    case LESSER:
-                    case EQUALS:
-                        addSpan(spansBuilder, token, "math", tokensLength);
-                        break;
-                    default:
-                        spansBuilder.add(Collections.emptyList(), token.length());
-                }
-            }
-            tokensLength += token.length();
-            if(codeParseInfo.getFirstToken() == null) codeParseInfo.setFirstToken(token);
-            codeParseInfo.setLastToken(token);
-        }
-        if(tokensLength == 0) {
-            spansBuilder.add(Collections.emptyList(), text.length());
-        }
-        codeParseInfo.setLastParsedCode(text);
-        return spansBuilder.create();
-    }
-
-    private void addSpan(StyleSpansBuilder<Collection<String>> spansBuilder, Token token, String style, int start) {
-        if(token.isPartial()) {
-            spansBuilder.add(Arrays.asList("error", style), token.length());
-        } else {
-            spansBuilder.add(Collections.singleton(style), token.length());
-        }
-        if(token.getHint()!=null && token.getHint().errorText != null) {
-            errorTokens.put(start, token);
-        }
-    }
-
-    private Lexer getLexerForChangedText(String newText) {
-        String oldText = codeParseInfo.getLastParsedCode();
-        if(oldText.isEmpty()) return new Lexer(newText);
-
-        // Индекс первого изменившегося символа в коде (с начала текста)
-        int firstChanged;
-        for (firstChanged = 0; firstChanged < oldText.length() && firstChanged < newText.length(); firstChanged++) {
-            if(oldText.charAt(firstChanged) != newText.charAt(firstChanged)) break;
-        }
-
-        // Индекс последнего изменившегося символа в коде (с конца текста)
-        int lastChanged;
-        for (lastChanged = 0; lastChanged < oldText.length() - firstChanged && lastChanged < newText.length() - firstChanged; lastChanged++) {
-            if(oldText.charAt(oldText.length() - 1 - lastChanged) != newText.charAt(newText.length() - 1 - lastChanged)) break;
-        }
-
-        Token before = codeParseInfo.getFirstToken();
-        if(before != null) {
-            for (int i = 0; i < newText.length(); i += before.length(), before = before.getNext()) {
-                if (i + before.length() >= firstChanged) {
-                    before = before.getPrev();
-                    firstChanged = i;
-                    break;
-                }
-            }
-        }
-
-        Token after = codeParseInfo.getLastToken();
-        if(after != null) {
-            for (int i = 0; i < newText.length(); i += after.length(), after = after.getPrev()) {
-                if (i + after.length() == lastChanged) break;
-                if (i + after.length() >= lastChanged) {
-                    after = after.getNext();
-                    lastChanged = i;
-                    break;
-                }
-            }
-        }
-
-        return new Lexer(newText, before, after, firstChanged, newText.length() - firstChanged - lastChanged);
     }
 }
