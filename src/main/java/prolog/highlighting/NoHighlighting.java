@@ -4,6 +4,7 @@ import org.fxmisc.richtext.model.StyleSpans;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.List;
 
 /**
  * Без подсветки синтаксиса
@@ -28,6 +29,11 @@ public class NoHighlighting implements Highlighter {
 
     @Override
     public String getMessageForPos(int pos) {
+        return null;
+    }
+
+    @Override
+    public List<HighlightingResult> changeStylesOnCursor(int pos) {
         return null;
     }
 }

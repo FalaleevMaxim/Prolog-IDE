@@ -8,6 +8,7 @@ import ru.prolog.syntaxmodel.tree.Token;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.List;
 
 /**
  * Подсветка по лексемам
@@ -16,17 +17,17 @@ public class LexerHighlighting implements Highlighter {
     /**
      * Последний обработанный код
      */
-    private String lastParsedCode = "";
+    protected String lastParsedCode = "";
 
     /**
      * Первый токен при последнем парсинге
      */
-    private Token firstToken;
+    protected Token firstToken;
 
     /**
      * Последний токен при последнем парсинге
      */
-    private Token lastToken;
+    protected Token lastToken;
 
     @Override
     public HighlightingResult computeHighlighting(String text) {
@@ -131,16 +132,20 @@ public class LexerHighlighting implements Highlighter {
         Token token = firstToken;
         for (int i = 0; token != null; i += token.length(), token = token.getNext()) {
             if (i <= pos && i + token.length() > pos) {
-                if (token.getHint() != null) {
-                    return token.getHint().errorText;
-                }
+                if(token.getTokenType() == null) return "Unknown character " + token.getText();
+                if (token.getHint() != null) return token.getHint().errorText;
                 return null;
             }
         }
         return null;
     }
 
-    private ChangedCode computeChange(String newText) {
+    @Override
+    public List<HighlightingResult> changeStylesOnCursor(int pos) {
+        return null;
+    }
+
+    protected ChangedCode computeChange(String newText) {
         String oldText = lastParsedCode;
         if (oldText.isEmpty()) return null;
 
@@ -181,7 +186,7 @@ public class LexerHighlighting implements Highlighter {
         return new ChangedCode(firstChanged, lastChanged, before, after);
     }
 
-    private Lexer getLexerForChangedText(String newText, ChangedCode change) {
+    protected Lexer getLexerForChangedText(String newText, ChangedCode change) {
         if(change == null) return new Lexer(newText);
         return new Lexer(newText, change.before, change.after, change.firstChanged, newText.length() - change.firstChanged - change.lastChanged);
     }

@@ -24,6 +24,7 @@ import prolog.devices.ProgramOutputDevice;
 import prolog.highlighting.Highlighter;
 import prolog.highlighting.LexerHighlighting;
 import prolog.highlighting.NoHighlighting;
+import prolog.highlighting.ParserHighlighting;
 import ru.prolog.compiler.CompileException;
 import ru.prolog.compiler.PrologCompiler;
 import ru.prolog.etc.exceptions.model.ModelStateException;
@@ -38,6 +39,7 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.Collection;
+import java.util.List;
 import java.util.ResourceBundle;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -58,6 +60,7 @@ public class Controller implements Initializable{
     public ToggleGroup highlightingToggleGroup;
     public RadioMenuItem noHighlightingMenuItem;
     public RadioMenuItem lexerHighlightingMenuItem;
+    public RadioMenuItem parserHighlightingMenuItem;
     public TextField stackSizeTF;
 
     private File file;
@@ -372,11 +375,23 @@ public class Controller implements Initializable{
             popup.hide();
         });
 
+        codeArea.caretPositionProperty().addListener((observable, oldValue, newValue) -> {
+            if(textChanged) return;
+            List<Highlighter.HighlightingResult> results = highlighter.changeStylesOnCursor(newValue);
+            if(results != null) {
+                for (Highlighter.HighlightingResult result : results) {
+                    codeArea.setStyleSpans(result.start, result.styleSpans);
+                }
+            }
+        });
+
         highlightingToggleGroup.selectedToggleProperty().addListener((observable, oldValue, newValue) -> {
             if(newValue == noHighlightingMenuItem) {
                 highlighter = new NoHighlighting();
             } else if(newValue == lexerHighlightingMenuItem) {
                 highlighter = new LexerHighlighting();
+            } else if(newValue == parserHighlightingMenuItem) {
+                highlighter = new ParserHighlighting();
             }
             updateHighlighting();
         });

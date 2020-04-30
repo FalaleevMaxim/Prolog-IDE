@@ -32,7 +32,7 @@
                 <content>
                     <HBox VBox.vgrow="NEVER" alignment="CENTER">
                         <Label text="Stack(Kb)" textFill="black"/>
-                        <TextField fx:id="stackSizeTF" text="100" prefWidth="80" />
+                        <TextField fx:id="stackSizeTF" text="100" prefWidth="80"/>
                     </HBox>
                 </content>
 
@@ -42,14 +42,18 @@
             <ToggleGroup fx:id="highlightingToggleGroup"/>
         </fx:define>
         <Menu id="highlightingMenu" mnemonicParsing="false" text="Highlighting">
-            <RadioMenuItem text="No highlighting"
-                           fx:id="noHighlightingMenuItem"
-                           toggleGroup="$highlightingToggleGroup"/>
-            <RadioMenuItem text="Use lexer"
-                           fx:id="lexerHighlightingMenuItem"
-                           selected="true"
-                           toggleGroup="$highlightingToggleGroup"/>
-            <SeparatorMenuItem/>
+            <Menu text="Highlighting mode">
+                <RadioMenuItem text="No highlighting"
+                               fx:id="noHighlightingMenuItem"
+                               toggleGroup="$highlightingToggleGroup"/>
+                <RadioMenuItem text="Use lexer"
+                               fx:id="lexerHighlightingMenuItem"
+                               selected="true"
+                               toggleGroup="$highlightingToggleGroup"/>
+                <RadioMenuItem text="Use parser"
+                               fx:id="parserHighlightingMenuItem"
+                               toggleGroup="$highlightingToggleGroup"/>
+            </Menu>
             <MenuItem id="updateHighlighting" text="Update highlighting" onAction="#updateHighlighting"/>
         </Menu>
     </MenuBar>
