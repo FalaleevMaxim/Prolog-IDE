@@ -92,6 +92,7 @@ public class ParserHighlighting implements Highlighter {
                     case ANONYMOUS:
                         styleClasses.add("anonymous");
                         break;
+                    case INCLUDE_KEYWORD:
                     case DOMAINS_KEYWORD:
                     case DATABASE_KEYWORD:
                     case PREDICATES_KEYWORD:

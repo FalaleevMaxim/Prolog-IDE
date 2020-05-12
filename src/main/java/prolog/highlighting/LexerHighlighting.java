@@ -35,11 +35,11 @@ public class LexerHighlighting implements Highlighter {
 
         ChangedCode changed = computeChange(text);
         Lexer lexer = getLexerForChangedText(text, changed);
-
-        firstToken = null;
-        lastToken = null;
+        if(changed == null || changed.before == null) firstToken = null;
+        if(changed == null || changed.after == null) lastToken = null;
         StyleSpansBuilder<Collection<String>> spansBuilder = new StyleSpansBuilder<>();
         int tokensLength = 0;
+        Token lastParsed = null;
         while (!lexer.isClosed()) {
             Token token = lexer.nextToken();
             if (token == null) break;
@@ -87,6 +87,7 @@ public class LexerHighlighting implements Highlighter {
                     case ANONYMOUS:
                         addSpan(spansBuilder, token, "anonymous", tokensLength);
                         break;
+                    case INCLUDE_KEYWORD:
                     case DOMAINS_KEYWORD:
                     case DATABASE_KEYWORD:
                     case PREDICATES_KEYWORD:
@@ -109,7 +110,10 @@ public class LexerHighlighting implements Highlighter {
             }
             tokensLength += token.length();
             if (firstToken == null) firstToken = token;
-            lastToken = token;
+            lastParsed = token;
+        }
+        if (lastToken == null) {
+            lastToken = lastParsed;
         }
         if (tokensLength == 0) {
             spansBuilder.add(Collections.emptyList(), 0);
@@ -176,7 +180,7 @@ public class LexerHighlighting implements Highlighter {
         Token after = lastToken;
         if (after != null) {
             for (int i = 0; i < newText.length(); i += after.length(), after = after.getPrev()) {
-                if (after.getNext() == null || i + after.length() >= lastChanged) {
+                if (after.getPrev() == null || i + after.length() >= lastChanged) {
                     after = after.getNext();
                     lastChanged = i;
                     break;
