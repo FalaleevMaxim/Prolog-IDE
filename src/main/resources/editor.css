@@ -60,6 +60,19 @@
     -rtfx-background-color: indianred;
 }
 
+.semanticError {
+    -rtfx-background-color: salmon;
+}
+
+.warning {
+    -rtfx-background-color: goldenrod;
+}
+
+.unused {
+    -fx-fill: grey;
+    -fx-font-style: italic;
+}
+
 .onCursor {
     -fx-fill: goldenrod;
 }

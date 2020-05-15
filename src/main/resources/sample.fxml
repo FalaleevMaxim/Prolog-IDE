@@ -53,7 +53,18 @@
                 <RadioMenuItem text="Use parser"
                                fx:id="parserHighlightingMenuItem"
                                toggleGroup="$highlightingToggleGroup"/>
+                <RadioMenuItem text="Use semantic analyzer"
+                               fx:id="semanticHighlightingMenuItem"
+                               toggleGroup="$highlightingToggleGroup"/>
             </Menu>
+            <CustomMenuItem id="highlightingDelay" hideOnClick="false" mnemonicParsing="false">
+                <content>
+                    <HBox VBox.vgrow="NEVER" alignment="CENTER">
+                        <Label text="Delay(ms)" textFill="black"/>
+                        <TextField fx:id="highlightingDelayTF" text="500" prefWidth="80"/>
+                    </HBox>
+                </content>
+            </CustomMenuItem>
             <MenuItem id="updateHighlighting" text="Update highlighting" onAction="#updateHighlighting"/>
         </Menu>
     </MenuBar>
