@@ -13,8 +13,7 @@ import ru.prolog.syntaxmodel.tree.misc.NodeError;
 import ru.prolog.syntaxmodel.tree.nodes.modules.ProgramNode;
 import ru.prolog.syntaxmodel.tree.semantics.SemanticAnalyzer;
 import ru.prolog.syntaxmodel.tree.semantics.SemanticInfo;
-import ru.prolog.syntaxmodel.tree.semantics.attributes.SymbolValue;
-import ru.prolog.syntaxmodel.tree.semantics.attributes.ToUsages;
+import ru.prolog.syntaxmodel.tree.semantics.attributes.*;
 import ru.prolog.syntaxmodel.tree.semantics.attributes.errors.AbstractSemanticError;
 import ru.prolog.syntaxmodel.tree.semantics.attributes.warnings.AbstractSemanticWarning;
 
@@ -244,6 +243,7 @@ public class SemanticHighlighting implements Highlighter {
     private void checkCursorStyleRules(Map<Token, Collection<String>> styles, Token token) {
         checkBrackets(styles, token);
         checkSeparators(styles, token);
+        checkUsages(styles, token);
     }
 
     private void checkBrackets(Map<Token, Collection<String>> styles, Token token) {
@@ -277,6 +277,46 @@ public class SemanticHighlighting implements Highlighter {
                 }
             }
         }
+    }
+
+    private void checkUsages(Map<Token, Collection<String>> styles, Token token) {
+        NameOf nameAttr = token.getSemanticInfo().getAttribute(NameOf.class);
+        if(nameAttr == null) return;
+        Named namedNode = nameAttr.getNamedNode();
+        Node declaration = null;
+        ToDeclaration toDeclaration = namedNode.getSemanticInfo().getAttribute(ToDeclaration.class);
+        ToUsages toUsages;
+        ToImplementations toImplementations;
+        if(toDeclaration != null) {
+            declaration = toDeclaration.getDeclaration();
+        } else {
+            if(namedNode.getSemanticInfo().getAttribute(ToUsages.class) != null) {
+                declaration = namedNode;
+            }
+        }
+        if(declaration == null) return;
+        toUsages = declaration.getSemanticInfo().getAttribute(ToUsages.class);
+        toImplementations = declaration.getSemanticInfo().getAttribute(ToImplementations.class);
+        addUsageToken(styles, declaration);
+        if(toUsages != null) {
+            for (Node usage : toUsages.getUsages()) {
+                addUsageToken(styles, usage);
+            }
+        }
+        if(toImplementations != null) {
+            for (Node implementation : toImplementations.getImplementations()) {
+                addUsageToken(styles, implementation);
+            }
+        }
+    }
+
+    private void addUsageToken(Map<Token, Collection<String>> styles, Node usage) {
+        Token usageToken;
+        if(usage instanceof Token) usageToken = (Token) usage;
+        else if(usage instanceof Named) usageToken = ((Named) usage).getName();
+        else return;
+        styles.put(usageToken, Arrays.asList("onCursor", "usage"));
+        lastHighlightedTokens.add(usageToken);
     }
 
     private Map<Token, Collection<String>> restoreLast() {

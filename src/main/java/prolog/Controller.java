@@ -32,7 +32,7 @@ import ru.prolog.runtime.context.program.ProgramContext;
 
 import java.io.*;
 import java.net.URL;
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.time.Duration;
@@ -42,6 +42,7 @@ import java.util.ResourceBundle;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+@SuppressWarnings("StatementWithEmptyBody")
 public class Controller implements Initializable {
     public ProgramInputDevice programInput;
     public ProgramOutputDevice programOutput;
@@ -86,7 +87,7 @@ public class Controller implements Initializable {
         this.file = file;
         try {
             byte[] encoded = Files.readAllBytes(file.toPath());
-            codeArea.replaceText(new String(encoded, Charset.forName("UTF-8")));
+            codeArea.replaceText(new String(encoded, StandardCharsets.UTF_8));
             fileSaved = true;
         } catch (IOException e) {
             alertReadError(e);
@@ -245,7 +246,7 @@ public class Controller implements Initializable {
     public boolean saveFile() {
         if (file == null) requestFileName();
         if (file == null) return false;
-        try (PrintWriter pw = new PrintWriter(new OutputStreamWriter(new FileOutputStream(file), Charset.forName("UTF-8")))) {
+        try (PrintWriter pw = new PrintWriter(new OutputStreamWriter(new FileOutputStream(file), StandardCharsets.UTF_8))) {
             String code = codeArea.getText();
             pw.write(code);
             setFileSaved(true);
@@ -319,10 +320,7 @@ public class Controller implements Initializable {
         codeArea.textProperty().addListener((observableValue, s, s2) -> setFileSaved(false));
         codeArea.textProperty().addListener((observableValue, s, s2) -> textChanged = true);
         codeArea.textProperty().addListener((observableValue, s, s2) -> updateCaretPos(codeArea.getCaretPosition()));
-        codeArea.caretPositionProperty().addListener((observable, oldValue, newValue) -> {
-            int pos = newValue.intValue();
-            updateCaretPos(pos);
-        });
+        codeArea.caretPositionProperty().addListener((observable, oldValue, newValue) -> updateCaretPos(newValue));
         codeArea.setParagraphGraphicFactory(LineNumberFactory.get(codeArea));
         final Pattern whiteSpace = Pattern.compile("^\\s+");
         codeArea.addEventHandler(KeyEvent.KEY_PRESSED, KE ->
@@ -505,11 +503,11 @@ public class Controller implements Initializable {
 
     private void updateCaretPos(int pos) {
         String text = codeArea.getText();
-        text = text.substring(0, pos > text.length() ? text.length() : pos);
+        text = text.substring(0, Math.min(pos, text.length()));
         String[] lines = text.split("\n");
         int line = lines.length;
         int inLine = lines.length == 0 ? 0 : lines[lines.length - 1].length();
-        caretPos.setText(Integer.toString(line) + ":" + inLine);
+        caretPos.setText(line + ":" + inLine);
     }
 
     public void onSaveAction(ActionEvent actionEvent) {
@@ -538,7 +536,7 @@ public class Controller implements Initializable {
         if (!requestFileName(false)) return;
         try {
             byte[] encoded = Files.readAllBytes(file.toPath());
-            codeArea.replaceText(new String(encoded, Charset.forName("UTF-8")));
+            codeArea.replaceText(new String(encoded, StandardCharsets.UTF_8));
             setFileSaved(true);
         } catch (IOException e) {
             alertReadError(e);

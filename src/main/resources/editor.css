@@ -76,3 +76,7 @@
 .onCursor {
     -fx-fill: goldenrod;
 }
+
+.usage {
+    -rtfx-background-color: seagreen;
+}
