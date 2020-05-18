@@ -7,10 +7,7 @@ import javafx.event.ActionEvent;
 import javafx.fxml.Initializable;
 import javafx.geometry.Point2D;
 import javafx.scene.control.*;
-import javafx.scene.input.KeyCode;
-import javafx.scene.input.KeyCombination;
-import javafx.scene.input.KeyEvent;
-import javafx.scene.input.MouseEvent;
+import javafx.scene.input.*;
 import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
 import javafx.stage.Popup;
@@ -381,6 +378,19 @@ public class Controller implements Initializable {
                 InputMap.consume(
                         EventPattern.keyPressed(KeyCode.DELETE, KeyCombination.SHIFT_DOWN),
                         e-> deleteLine())));
+        Nodes.addInputMap(codeArea, InputMap.sequence(
+                InputMap.consume(
+                        EventPattern.keyPressed(new KeyCodeCombination(KeyCode.TAB,
+                                KeyCombination.ModifierValue.UP,
+                                KeyCombination.ModifierValue.ANY,
+                                KeyCombination.ModifierValue.ANY,
+                                KeyCombination.ModifierValue.ANY,
+                                KeyCombination.ModifierValue.ANY)),
+                        e-> codeArea.replaceSelection("    "))));
+        Nodes.addInputMap(codeArea, InputMap.sequence(
+                InputMap.consume(
+                        EventPattern.keyPressed(KeyCode.TAB, KeyCombination.SHIFT_DOWN),
+                        e-> untab())));
 
         highlightingToggleGroup.selectedToggleProperty().addListener((observable, oldValue, newValue) -> {
             if (newValue == noHighlightingMenuItem) {
@@ -469,6 +479,23 @@ public class Controller implements Initializable {
         String line = text.substring(lineStart, i);
         codeArea.deleteText(lineStart, i);
         codeArea.moveTo(caretPosition);
+    }
+
+    private void untab() {
+        int caretPosition = codeArea.getCaretPosition();
+        String text = codeArea.getText();
+        final int lineStart = text.substring(0, caretPosition).lastIndexOf('\n')+1;
+        if(text.charAt(lineStart) == '\t') {
+            codeArea.deleteText(lineStart, lineStart+1);
+            codeArea.moveTo(caretPosition-1);
+            return;
+        }
+        int i;
+        for (i = 0; i < 4; i++) {
+            if(text.charAt(lineStart+i) != ' ') break;
+        }
+        codeArea.deleteText(lineStart, lineStart+i);
+        codeArea.moveTo(caretPosition-i);
     }
 
     public void updateHighlighting() {
