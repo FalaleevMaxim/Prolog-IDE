@@ -1,5 +1,6 @@
 package prolog.highlighting;
 
+import javafx.scene.control.ContextMenu;
 import org.fxmisc.richtext.model.StyleSpans;
 import org.fxmisc.richtext.model.StyleSpansBuilder;
 import ru.prolog.syntaxmodel.recognizers.Lexer;
@@ -147,6 +148,16 @@ public class LexerHighlighting implements Highlighter {
     @Override
     public List<HighlightingResult> changeStylesOnCursor(int pos) {
         return null;
+    }
+
+    @Override
+    public ContextMenu getContextMenu(int pos) {
+        return null;
+    }
+
+    @Override
+    public void close() {
+
     }
 
     protected ChangedCode computeChange(String newText) {

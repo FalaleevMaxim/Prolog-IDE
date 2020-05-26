@@ -21,7 +21,10 @@ public class Main extends Application {
         Controller c = loader.getController();
 
         primaryStage.setOnCloseRequest(event -> {
-            if(c.isFileSaved()) return;
+            if(c.isFileSaved()) {
+                c.close();
+                return;
+            }
             Alert alert = new Alert(Alert.AlertType.WARNING, "", ButtonType.YES, ButtonType.NO, ButtonType.CANCEL);
             alert.setHeaderText("Save file?");
             alert.setTitle("File not saved!");
@@ -31,6 +34,7 @@ public class Main extends Application {
                 //If Yes, but save failed, do not close window
             else if(result==ButtonType.YES && !c.saveFile()) event.consume();
             //Answer NO or file successfully saved, close window
+            else c.close();
         });
 
         List<String> args = getParameters().getRaw();

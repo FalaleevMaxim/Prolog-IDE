@@ -1,7 +1,19 @@
 package prolog.highlighting;
 
+import javafx.scene.Scene;
+import javafx.scene.control.ContextMenu;
+import javafx.scene.control.Label;
+import javafx.scene.control.MenuItem;
+import javafx.scene.control.ScrollPane;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.VBox;
+import javafx.stage.Modality;
+import javafx.stage.Stage;
+import org.fxmisc.richtext.CodeArea;
 import org.fxmisc.richtext.model.StyleSpans;
 import org.fxmisc.richtext.model.StyleSpansBuilder;
+import org.fxmisc.richtext.model.StyledDocument;
+import ru.prolog.syntaxmodel.TokenType;
 import ru.prolog.syntaxmodel.recognizers.Lexer;
 import ru.prolog.syntaxmodel.tree.AbstractNode;
 import ru.prolog.syntaxmodel.tree.Node;
@@ -27,6 +39,13 @@ public class SemanticHighlighting implements Highlighter {
     private final Set<Token> lastHighlightedTokens = new HashSet<>();
     private SemanticAnalyzer semanticAnalyzer;
 
+    private final CodeArea codeArea;
+    private Stage goToWindow;
+
+    public SemanticHighlighting(CodeArea codeArea) {
+        this.codeArea = codeArea;
+    }
+
     @Override
     public HighlightingResult computeHighlighting(String text) {
         return new HighlightingResult(0, computeHighlightingFull(text));
@@ -34,6 +53,10 @@ public class SemanticHighlighting implements Highlighter {
 
     @Override
     public StyleSpans<Collection<String>> computeHighlightingFull(String text) {
+        if(goToWindow != null) {
+            goToWindow.close();
+            goToWindow = null;
+        }
         cachedTokenStyles.clear();
         lastHighlightedTokens.clear();
         tokenNodeErrors.clear();
@@ -240,10 +263,167 @@ public class SemanticHighlighting implements Highlighter {
         return results;
     }
 
+    @Override
+    public ContextMenu getContextMenu(int pos) {
+        List<MenuItem> menuItems = new ArrayList<>();
+        Token token = treeRoot.tokenByRelativePos(pos);
+        if (pos < treeRoot.length()) {
+            checkMenuItems(menuItems, token);
+        }
+        pos -= 1;
+        if (pos > 0 && pos < treeRoot.length()) {
+            Token token1 = treeRoot.tokenByRelativePos(pos);
+            if(token1 != token) {
+                checkMenuItems(menuItems, token1);
+            }
+        }
+        if(menuItems.isEmpty()) return null;
+        ContextMenu contextMenu = new ContextMenu();
+        for (MenuItem menuItem : menuItems) {
+            contextMenu.getItems().add(menuItem);
+        }
+        return contextMenu;
+    }
+
+    @Override
+    public void close() {
+        if(goToWindow != null) {
+            goToWindow.close();
+            goToWindow = null;
+        }
+    }
+
+    private void checkMenuItems(List<MenuItem> menuItems, Token token) {
+        NameOf nameAttr = token.getSemanticInfo().getAttribute(NameOf.class);
+        if(nameAttr == null) return;
+        Node namedNode = nameAttr.getNamedNode();
+        ToDeclaration toDeclaration = namedNode.getSemanticInfo().getAttribute(ToDeclaration.class);
+        if(toDeclaration != null) {
+            Node declaration = toDeclaration.getDeclaration();
+            MenuItem goToDeclaration = new MenuItem("Go to declaration");
+            goToDeclaration.setOnAction(event -> {
+                codeArea.moveTo(declaration.startPos());
+                codeArea.requestFollowCaret();
+            });
+            menuItems.add(goToDeclaration);
+        }
+        ToImplementations toImplementations = namedNode.getSemanticInfo().getAttribute(ToImplementations.class);
+        if(toImplementations!=null) {
+            Set<Node> implementations = toImplementations.getImplementations();
+            if(!implementations.isEmpty()) {
+                addFindAction(menuItems, implementations,
+                        "Go to implementations of " + token.getText(),
+                        "Implementations of " + token.getText());
+            }
+        }
+
+        ToUsages toUsages = namedNode.getSemanticInfo().getAttribute(ToUsages.class);
+        if(toUsages != null) {
+            Set<Node> usages = toUsages.getUsages();
+            if(!usages.isEmpty()) {
+                addFindAction(menuItems, usages,
+                        "Go to usages of " + token.getText(),
+                        "Usages of " + token.getText());
+            }
+        }
+    }
+
+    /**
+     * Добавляет в контекстное меню действие по переходу к узлам.
+     *
+     * @param menuItems Список действий контекстного меню.
+     * @param foundNodes Найденные узлы, к которым должно вести действие
+     * @param menuText Название действия в контекстном меню
+     * @param windowTitle Заголовок окна, в котором отобразятся результаты поиска, если их несколько
+     */
+    private void addFindAction(List<MenuItem> menuItems, Set<Node> foundNodes, String menuText, String windowTitle) {
+        MenuItem menuItem = new MenuItem(menuText);
+        if (foundNodes.size() == 1) {
+            Node singleResult = foundNodes.iterator().next();
+            menuItem.setOnAction(event -> {
+                codeArea.moveTo(singleResult.startPos());
+                codeArea.requestFollowCaret();
+            });
+        } else {
+            menuItem.setOnAction(event -> showFindResultsWindow(foundNodes, windowTitle));
+        }
+        menuItems.add(menuItem);
+    }
+
+    private void showFindResultsWindow(Collection<Node> results, String title) {
+        Map<Token, Collection<String>> restoreStyles = restoreLast();
+        for (Map.Entry<Token, Collection<String>> style : restoreStyles.entrySet()) {
+            Token token = style.getKey();
+            codeArea.setStyleSpans(token.startPos(), StyleSpans.singleton(style.getValue(), token.length()) );
+        }
+
+        if(goToWindow != null) {
+            goToWindow.close();
+        }
+        goToWindow = new Stage();
+        goToWindow.setTitle(title);
+        goToWindow.initModality(Modality.NONE);
+
+        VBox layout = new VBox();
+        ScrollPane scrollPane = new ScrollPane(layout);
+        scrollPane.setFitToWidth(true);
+        Scene scene = new Scene(scrollPane, 300, 200);
+        goToWindow.setScene(scene);
+
+        results = results.stream().sorted(Comparator.comparingInt(Node::startPos)).collect(Collectors.toList());
+        for (Node result : results) {
+            int lineNumber = result.line();
+            StyledDocument<Collection<String>, String, Collection<String>> styledLine = codeArea.subDocument(lineNumber);
+            CodeArea line = new CodeArea();
+            line.setEditable(false);
+            VBox.setVgrow(line, Priority.NEVER);
+            line.setParagraphGraphicFactory(n->new Label(lineNumber + ":"));
+            line.setMaxHeight(30);
+            line.getStylesheets().addAll(codeArea.getStylesheets());
+            line.append(styledLine);
+            layout.getChildren().add(line);
+
+            line.setOnMouseClicked(event -> {
+                int startPos = result.startPos();
+                codeArea.selectRange(startPos, startPos + result.firstToken().length());
+                codeArea.requestFollowCaret();
+            });
+        }
+
+        goToWindow.show();
+    }
+
     private void checkCursorStyleRules(Map<Token, Collection<String>> styles, Token token) {
         checkBrackets(styles, token);
         checkSeparators(styles, token);
         checkUsages(styles, token);
+        checkVariable(styles, token);
+    }
+
+    private void checkVariable(Map<Token, Collection<String>> styles, Token token) {
+        if(token.getTokenType() != TokenType.VARIABLE) return;
+        ToVariablesHolder toVariablesHolder = token.getSemanticInfo().getAttribute(ToVariablesHolder.class);
+        if(toVariablesHolder == null) return;
+        VariablesHolder variablesHolder = toVariablesHolder.getVariablesHolder();
+        String name = token.getText();
+        for (Token variable : variablesHolder.byName(name)) {
+            styles.put(variable, Arrays.asList("onCursor", "usage"));
+            lastHighlightedTokens.add(variable);
+        }
+        if(variablesHolder instanceof StatementSetVariablesHolder) {
+            RuleLeftVariablesHolder ruleLeftVariablesHolder = ((StatementSetVariablesHolder) variablesHolder).getRuleLeftVariablesHolder();
+            for (Token variable : ruleLeftVariablesHolder.byName(name)) {
+                styles.put(variable, Arrays.asList("onCursor", "usage"));
+                lastHighlightedTokens.add(variable);
+            }
+        } else if(variablesHolder instanceof RuleLeftVariablesHolder) {
+            for (StatementSetVariablesHolder statementSetVariablesHolder : ((RuleLeftVariablesHolder) variablesHolder).getStatementSetVariablesHolders()) {
+                for (Token variable : statementSetVariablesHolder.byName(name)) {
+                    styles.put(variable, Arrays.asList("onCursor", "usage"));
+                    lastHighlightedTokens.add(variable);
+                }
+            }
+        }
     }
 
     private void checkBrackets(Map<Token, Collection<String>> styles, Token token) {
@@ -282,7 +462,7 @@ public class SemanticHighlighting implements Highlighter {
     private void checkUsages(Map<Token, Collection<String>> styles, Token token) {
         NameOf nameAttr = token.getSemanticInfo().getAttribute(NameOf.class);
         if(nameAttr == null) return;
-        Named namedNode = nameAttr.getNamedNode();
+        Node namedNode = nameAttr.getNamedNode();
         Node declaration = null;
         ToDeclaration toDeclaration = namedNode.getSemanticInfo().getAttribute(ToDeclaration.class);
         ToUsages toUsages;

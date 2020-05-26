@@ -38,12 +38,16 @@ import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.Collection;
 import java.util.List;
+import java.util.OptionalInt;
 import java.util.ResourceBundle;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 @SuppressWarnings("StatementWithEmptyBody")
 public class Controller implements Initializable {
+    public static final String POPUP_STYLE = "-fx-background-color: grey;" +
+            "-fx-text-fill: darkred;" +
+            "-fx-padding: 5;";
     public ProgramInputDevice programInput;
     public ProgramOutputDevice programOutput;
     public CodeArea codeArea;
@@ -344,7 +348,7 @@ public class Controller implements Initializable {
                         "-fx-padding: 5;");
         popup.getContent().add(popupMsg);
 
-        codeArea.setMouseOverTextDelay(Duration.ofSeconds(1));
+        codeArea.setMouseOverTextDelay(Duration.ofMillis(250));
         codeArea.addEventHandler(MouseOverTextEvent.MOUSE_OVER_TEXT_BEGIN, e -> {
             if (textChanged) return;
             int chIdx = e.getCharacterIndex();
@@ -368,14 +372,25 @@ public class Controller implements Initializable {
                 }
             }
         });
+        codeArea.setOnContextMenuRequested(event -> {
+            codeArea.hideContextMenu();
+            OptionalInt characterIndex = codeArea.hit(event.getX(), event.getY()).getCharacterIndex();
+            if(!characterIndex.isPresent()) return;
+            ContextMenu contextMenu = highlighter.getContextMenu(characterIndex.getAsInt());
+            if(contextMenu == null) return;
+            contextMenu.setAutoHide(true);
+            codeArea.setContextMenu(contextMenu);
+
+            contextMenu.show(codeArea, event.getScreenX(), event.getScreenY());
+        });
         Nodes.addInputMap(codeArea, InputMap.sequence(
                 InputMap.consume(
                         EventPattern.keyPressed(KeyCode.D, KeyCombination.CONTROL_DOWN),
-                        e-> duplicateLine())));
+                        e -> duplicateLine())));
         Nodes.addInputMap(codeArea, InputMap.sequence(
                 InputMap.consume(
                         EventPattern.keyPressed(KeyCode.DELETE, KeyCombination.SHIFT_DOWN),
-                        e-> deleteLine())));
+                        e -> deleteLine())));
         Nodes.addInputMap(codeArea, InputMap.sequence(
                 InputMap.consume(
                         EventPattern.keyPressed(new KeyCodeCombination(KeyCode.TAB,
@@ -384,13 +399,14 @@ public class Controller implements Initializable {
                                 KeyCombination.ModifierValue.ANY,
                                 KeyCombination.ModifierValue.ANY,
                                 KeyCombination.ModifierValue.ANY)),
-                        e-> codeArea.replaceSelection("    "))));
+                        e -> codeArea.replaceSelection("    "))));
         Nodes.addInputMap(codeArea, InputMap.sequence(
                 InputMap.consume(
                         EventPattern.keyPressed(KeyCode.TAB, KeyCombination.SHIFT_DOWN),
-                        e-> untab())));
+                        e -> untab())));
 
         highlightingToggleGroup.selectedToggleProperty().addListener((observable, oldValue, newValue) -> {
+            highlighter.close();
             if (newValue == noHighlightingMenuItem) {
                 highlighter = new NoHighlighting();
             } else if (newValue == lexerHighlightingMenuItem) {
@@ -398,7 +414,7 @@ public class Controller implements Initializable {
             } else if (newValue == parserHighlightingMenuItem) {
                 highlighter = new ParserHighlighting();
             } else if (newValue == semanticHighlightingMenuItem) {
-                highlighter = new SemanticHighlighting();
+                highlighter = new SemanticHighlighting(codeArea);
             }
             updateHighlighting();
         });
@@ -432,10 +448,10 @@ public class Controller implements Initializable {
     }
 
     private void subscribeHighlighter(int millis) {
-        if(updateHighlightSubscription != null) {
+        if (updateHighlightSubscription != null) {
             updateHighlightSubscription.unsubscribe();
         }
-        updateHighlightSubscription =  codeArea
+        updateHighlightSubscription = codeArea
                 // plain changes = ignore style changes that are emitted when syntax highlighting is reapplied
                 // multi plain changes = save computation by not rerunning the code multiple times
                 //   when making multiple changes (e.g. renaming a method at multiple parts in file)
@@ -455,11 +471,11 @@ public class Controller implements Initializable {
     private void duplicateLine() {
         int caretPosition = codeArea.getCaretPosition();
         String text = codeArea.getText();
-        final int lineStart = text.substring(0, caretPosition).lastIndexOf('\n')+1;
+        final int lineStart = text.substring(0, caretPosition).lastIndexOf('\n') + 1;
         int i;
-        for (i = lineStart; i < text.length() && text.charAt(i) != '\r' && text.charAt(i) != '\n'; i++);
-        if(i<text.length() && text.charAt(i) == '\r') i++;
-        if(i<text.length() && text.charAt(i) == '\n') i++;
+        for (i = lineStart; i < text.length() && text.charAt(i) != '\r' && text.charAt(i) != '\n'; i++) ;
+        if (i < text.length() && text.charAt(i) == '\r') i++;
+        if (i < text.length() && text.charAt(i) == '\n') i++;
         String line = text.substring(lineStart, i);
         int start = i;
         codeArea.insertText(start, line);
@@ -469,11 +485,11 @@ public class Controller implements Initializable {
     private void deleteLine() {
         int caretPosition = codeArea.getCaretPosition();
         String text = codeArea.getText();
-        final int lineStart = text.substring(0, caretPosition).lastIndexOf('\n')+1;
+        final int lineStart = text.substring(0, caretPosition).lastIndexOf('\n') + 1;
         int i;
-        for (i = lineStart; i < text.length() && text.charAt(i) != '\r' && text.charAt(i) != '\n'; i++);
-        if(i<text.length() && text.charAt(i) == '\r') i++;
-        if(i<text.length() && text.charAt(i) == '\n') i++;
+        for (i = lineStart; i < text.length() && text.charAt(i) != '\r' && text.charAt(i) != '\n'; i++) ;
+        if (i < text.length() && text.charAt(i) == '\r') i++;
+        if (i < text.length() && text.charAt(i) == '\n') i++;
         String line = text.substring(lineStart, i);
         codeArea.deleteText(lineStart, i);
         codeArea.moveTo(caretPosition);
@@ -482,18 +498,18 @@ public class Controller implements Initializable {
     private void untab() {
         int caretPosition = codeArea.getCaretPosition();
         String text = codeArea.getText();
-        final int lineStart = text.substring(0, caretPosition).lastIndexOf('\n')+1;
-        if(text.charAt(lineStart) == '\t') {
-            codeArea.deleteText(lineStart, lineStart+1);
-            codeArea.moveTo(caretPosition-1);
+        final int lineStart = text.substring(0, caretPosition).lastIndexOf('\n') + 1;
+        if (text.charAt(lineStart) == '\t') {
+            codeArea.deleteText(lineStart, lineStart + 1);
+            codeArea.moveTo(caretPosition - 1);
             return;
         }
         int i;
         for (i = 0; i < 4; i++) {
-            if(text.charAt(lineStart+i) != ' ') break;
+            if (text.charAt(lineStart + i) != ' ') break;
         }
-        codeArea.deleteText(lineStart, lineStart+i);
-        codeArea.moveTo(caretPosition-i);
+        codeArea.deleteText(lineStart, lineStart + i);
+        codeArea.moveTo(caretPosition - i);
     }
 
     public void updateHighlighting() {
@@ -560,5 +576,9 @@ public class Controller implements Initializable {
 
     public void stopMenuAction(ActionEvent actionEvent) {
         stop();
+    }
+
+    public void close() {
+        highlighter.close();
     }
 }

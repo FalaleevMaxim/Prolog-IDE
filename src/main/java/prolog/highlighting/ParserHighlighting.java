@@ -1,5 +1,6 @@
 package prolog.highlighting;
 
+import javafx.scene.control.ContextMenu;
 import org.fxmisc.richtext.model.StyleSpans;
 import org.fxmisc.richtext.model.StyleSpansBuilder;
 import ru.prolog.syntaxmodel.recognizers.Lexer;
@@ -179,6 +180,16 @@ public class ParserHighlighting implements Highlighter {
             results.add(new HighlightingResult(key.startPos(), spansBuilder.create()));
         }
         return results;
+    }
+
+    @Override
+    public ContextMenu getContextMenu(int pos) {
+        return null;
+    }
+
+    @Override
+    public void close() {
+
     }
 
     private void checkCursorStyleRules(Map<Token, Collection<String>> styles, Token token) {

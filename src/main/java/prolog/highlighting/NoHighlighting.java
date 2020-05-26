@@ -1,5 +1,6 @@
 package prolog.highlighting;
 
+import javafx.scene.control.ContextMenu;
 import org.fxmisc.richtext.model.StyleSpans;
 
 import java.util.Collection;
@@ -35,5 +36,15 @@ public class NoHighlighting implements Highlighter {
     @Override
     public List<HighlightingResult> changeStylesOnCursor(int pos) {
         return null;
+    }
+
+    @Override
+    public ContextMenu getContextMenu(int pos) {
+        return null;
+    }
+
+    @Override
+    public void close() {
+
     }
 }

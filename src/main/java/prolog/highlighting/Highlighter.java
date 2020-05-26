@@ -1,5 +1,6 @@
 package prolog.highlighting;
 
+import javafx.scene.control.ContextMenu;
 import org.fxmisc.richtext.model.StyleSpans;
 
 import java.util.Collection;
@@ -39,6 +40,18 @@ public interface Highlighter {
      * @return Стили для участков текста
      */
     List<HighlightingResult> changeStylesOnCursor(int pos);
+
+    /**
+     * Показать контекстное меню при правом клике по коду
+     *
+     * @param pos позиция клика в тексте
+     */
+    ContextMenu getContextMenu(int pos);
+
+    /**
+     * Закрывает все ресурсы, связанные с объектом подсветки, при закрытии окна или всене типа подсветки
+     */
+    void close();
 
     /**
      * Результат подсветки синтаксиса
