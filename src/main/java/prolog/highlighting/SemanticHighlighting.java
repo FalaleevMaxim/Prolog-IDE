@@ -1,10 +1,9 @@
 package prolog.highlighting;
 
+import javafx.beans.binding.Bindings;
+import javafx.beans.binding.BooleanBinding;
 import javafx.scene.Scene;
-import javafx.scene.control.ContextMenu;
-import javafx.scene.control.Label;
-import javafx.scene.control.MenuItem;
-import javafx.scene.control.ScrollPane;
+import javafx.scene.control.*;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.stage.Modality;
@@ -28,6 +27,7 @@ import ru.prolog.syntaxmodel.tree.semantics.SemanticInfo;
 import ru.prolog.syntaxmodel.tree.semantics.attributes.*;
 import ru.prolog.syntaxmodel.tree.semantics.attributes.errors.AbstractSemanticError;
 import ru.prolog.syntaxmodel.tree.semantics.attributes.warnings.AbstractSemanticWarning;
+import ru.prolog.util.NameChecker;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -295,37 +295,95 @@ public class SemanticHighlighting implements Highlighter {
 
     private void checkMenuItems(List<MenuItem> menuItems, Token token) {
         NameOf nameAttr = token.getSemanticInfo().getAttribute(NameOf.class);
-        if(nameAttr == null) return;
-        Node namedNode = nameAttr.getNamedNode();
-        ToDeclaration toDeclaration = namedNode.getSemanticInfo().getAttribute(ToDeclaration.class);
-        if(toDeclaration != null) {
-            Node declaration = toDeclaration.getDeclaration();
-            MenuItem goToDeclaration = new MenuItem("Go to declaration");
-            goToDeclaration.setOnAction(event -> {
-                codeArea.moveTo(declaration.startPos());
-                codeArea.requestFollowCaret();
-            });
-            menuItems.add(goToDeclaration);
-        }
-        ToImplementations toImplementations = namedNode.getSemanticInfo().getAttribute(ToImplementations.class);
-        if(toImplementations!=null) {
-            Set<Node> implementations = toImplementations.getImplementations();
-            if(!implementations.isEmpty()) {
-                addFindAction(menuItems, implementations,
-                        "Go to implementations of " + token.getText(),
-                        "Implementations of " + token.getText());
+        if(nameAttr != null) {
+            Node namedNode = nameAttr.getNamedNode();
+            ToDeclaration toDeclaration = namedNode.getSemanticInfo().getAttribute(ToDeclaration.class);
+            if (toDeclaration != null) {
+                Node declaration = toDeclaration.getDeclaration();
+                MenuItem goToDeclaration = new MenuItem("Go to declaration");
+                goToDeclaration.setOnAction(event -> {
+                    codeArea.moveTo(declaration.startPos());
+                    codeArea.requestFollowCaret();
+                });
+                menuItems.add(goToDeclaration);
             }
-        }
+            ToImplementations toImplementations = namedNode.getSemanticInfo().getAttribute(ToImplementations.class);
+            if (toImplementations != null) {
+                Set<Node> implementations = toImplementations.getImplementations();
+                if (!implementations.isEmpty()) {
+                    addFindAction(menuItems, implementations,
+                            "Go to implementations of " + token.getText(),
+                            "Implementations of " + token.getText());
+                }
+            }
 
-        ToUsages toUsages = namedNode.getSemanticInfo().getAttribute(ToUsages.class);
-        if(toUsages != null) {
-            Set<Node> usages = toUsages.getUsages();
-            if(!usages.isEmpty()) {
-                addFindAction(menuItems, usages,
-                        "Go to usages of " + token.getText(),
-                        "Usages of " + token.getText());
+            ToUsages toUsages = namedNode.getSemanticInfo().getAttribute(ToUsages.class);
+            if (toUsages != null) {
+                Set<Node> usages = toUsages.getUsages();
+                if (!usages.isEmpty()) {
+                    addFindAction(menuItems, usages,
+                            "Go to usages of " + token.getText(),
+                            "Usages of " + token.getText());
+                }
+            }
+
+            List<Token> usages = getUsages(token);
+            if (!usages.isEmpty()) {
+                MenuItem rename = new MenuItem("Rename");
+                rename.setOnAction(event -> {
+                    TextInputDialog dialog = new TextInputDialog(token.getText());
+                    dialog.setTitle("Rename " + token.getText());
+                    dialog.setHeaderText("Enter new name:");
+                    Button okButton = (Button) dialog.getDialogPane().lookupButton(ButtonType.OK);
+                    TextField inputField = dialog.getEditor();
+                    BooleanBinding isInvalid = Bindings.createBooleanBinding(
+                            () -> !NameChecker.canBeName(inputField.getText()),
+                            inputField.textProperty());
+                    okButton.disableProperty().bind(isInvalid);
+
+                    Optional<String> result = dialog.showAndWait();
+                    if (!result.isPresent()) return;
+                    usages.forEach(t -> t.setText(result.get()));
+                    codeArea.replaceText(treeRoot.getText());
+                });
+                menuItems.add(rename);
+            }
+        } else {
+            List<Token> variableUsages = getVariableUsages(token);
+            if (!variableUsages.isEmpty()) {
+                MenuItem rename = new MenuItem("Rename");
+                rename.setOnAction(event -> {
+                    TextInputDialog dialog = new TextInputDialog(token.getText());
+                    dialog.setTitle("Rename " + token.getText());
+                    dialog.setHeaderText("Enter new name:");
+                    Button okButton = (Button) dialog.getDialogPane().lookupButton(ButtonType.OK);
+                    TextField inputField = dialog.getEditor();
+                    VariablesHolder variablesHolder = token.getSemanticInfo().getAttribute(ToVariablesHolder.class).getVariablesHolder();
+                    BooleanBinding isInvalid = Bindings.createBooleanBinding(
+                            () -> !NameChecker.canBeVariableName(inputField.getText()) || checkVariableExists(inputField.getText(), variablesHolder),
+                            inputField.textProperty());
+                    okButton.disableProperty().bind(isInvalid);
+
+                    Optional<String> result = dialog.showAndWait();
+                    if (!result.isPresent()) return;
+                    variableUsages.forEach(t -> t.setText(result.get()));
+                    codeArea.replaceText(treeRoot.getText());
+                });
+                menuItems.add(rename);
             }
         }
+    }
+
+    private boolean checkVariableExists (String name, VariablesHolder holder) {
+        if(!holder.byName(name).isEmpty()) return true;
+        if(holder instanceof StatementSetVariablesHolder) {
+            return !((StatementSetVariablesHolder) holder).getRuleLeftVariablesHolder().byName(name).isEmpty();
+        }
+        if(holder instanceof RuleLeftVariablesHolder) {
+            return !((RuleLeftVariablesHolder) holder).getStatementSetVariablesHolders().stream()
+                    .map(statementSetVariablesHolder ->holder.byName(name)).allMatch(Set::isEmpty);
+        }
+        return false;
     }
 
     /**
@@ -401,29 +459,27 @@ public class SemanticHighlighting implements Highlighter {
     }
 
     private void checkVariable(Map<Token, Collection<String>> styles, Token token) {
-        if(token.getTokenType() != TokenType.VARIABLE) return;
+        for (Token usage : getVariableUsages(token)) {
+            addUsageToken(styles, usage);
+        }
+    }
+
+    private List<Token> getVariableUsages(Token token) {
+        if(token.getTokenType() != TokenType.VARIABLE) return Collections.emptyList();
         ToVariablesHolder toVariablesHolder = token.getSemanticInfo().getAttribute(ToVariablesHolder.class);
-        if(toVariablesHolder == null) return;
+        if(toVariablesHolder == null) return Collections.emptyList();
         VariablesHolder variablesHolder = toVariablesHolder.getVariablesHolder();
         String name = token.getText();
-        for (Token variable : variablesHolder.byName(name)) {
-            styles.put(variable, Arrays.asList("onCursor", "usage"));
-            lastHighlightedTokens.add(variable);
-        }
+        List<Token> usages = new ArrayList<>(variablesHolder.byName(name));
         if(variablesHolder instanceof StatementSetVariablesHolder) {
             RuleLeftVariablesHolder ruleLeftVariablesHolder = ((StatementSetVariablesHolder) variablesHolder).getRuleLeftVariablesHolder();
-            for (Token variable : ruleLeftVariablesHolder.byName(name)) {
-                styles.put(variable, Arrays.asList("onCursor", "usage"));
-                lastHighlightedTokens.add(variable);
-            }
+            usages.addAll(ruleLeftVariablesHolder.byName(name));
         } else if(variablesHolder instanceof RuleLeftVariablesHolder) {
             for (StatementSetVariablesHolder statementSetVariablesHolder : ((RuleLeftVariablesHolder) variablesHolder).getStatementSetVariablesHolders()) {
-                for (Token variable : statementSetVariablesHolder.byName(name)) {
-                    styles.put(variable, Arrays.asList("onCursor", "usage"));
-                    lastHighlightedTokens.add(variable);
-                }
+                usages.addAll(statementSetVariablesHolder.byName(name));
             }
         }
+        return usages;
     }
 
     private void checkBrackets(Map<Token, Collection<String>> styles, Token token) {
@@ -460,8 +516,14 @@ public class SemanticHighlighting implements Highlighter {
     }
 
     private void checkUsages(Map<Token, Collection<String>> styles, Token token) {
+        for (Token usage : getUsages(token)) {
+            addUsageToken(styles, usage);
+        }
+    }
+
+    private List<Token> getUsages(Token token) {
         NameOf nameAttr = token.getSemanticInfo().getAttribute(NameOf.class);
-        if(nameAttr == null) return;
+        if(nameAttr == null) return Collections.emptyList();
         Node namedNode = nameAttr.getNamedNode();
         Node declaration = null;
         ToDeclaration toDeclaration = namedNode.getSemanticInfo().getAttribute(ToDeclaration.class);
@@ -474,27 +536,32 @@ public class SemanticHighlighting implements Highlighter {
                 declaration = namedNode;
             }
         }
-        if(declaration == null) return;
+        if(declaration == null) return Collections.emptyList();
+        List<Token> usagesTokens = new ArrayList<>();
         toUsages = declaration.getSemanticInfo().getAttribute(ToUsages.class);
         toImplementations = declaration.getSemanticInfo().getAttribute(ToImplementations.class);
-        addUsageToken(styles, declaration);
+        usagesTokens.add(getUsageToken(declaration));
         if(toUsages != null) {
             for (Node usage : toUsages.getUsages()) {
-                addUsageToken(styles, usage);
+                usagesTokens.add(getUsageToken(usage));
             }
         }
         if(toImplementations != null) {
             for (Node implementation : toImplementations.getImplementations()) {
-                addUsageToken(styles, implementation);
+                usagesTokens.add(getUsageToken(implementation));
             }
         }
+        return usagesTokens;
     }
 
-    private void addUsageToken(Map<Token, Collection<String>> styles, Node usage) {
-        Token usageToken;
+    private Token getUsageToken(Node usage) {
+        Token usageToken = null;
         if(usage instanceof Token) usageToken = (Token) usage;
         else if(usage instanceof Named) usageToken = ((Named) usage).getName();
-        else return;
+        return usageToken;
+    }
+
+    private void addUsageToken(Map<Token, Collection<String>> styles, Token usageToken) {
         styles.put(usageToken, Arrays.asList("onCursor", "usage"));
         lastHighlightedTokens.add(usageToken);
     }
