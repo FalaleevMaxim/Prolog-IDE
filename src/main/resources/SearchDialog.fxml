@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.CheckBox?>
+<?import javafx.scene.control.TextArea?>
+<?import javafx.scene.layout.*?>
+<VBox xmlns="http://javafx.com/javafx"
+      xmlns:fx="http://javafx.com/fxml"
+      fx:controller="prolog.SearchDialogController"
+      prefHeight="100.0" prefWidth="300.0">
+    <TextArea prefHeight="50" fx:id="textInput" promptText="Text to find" VBox.vgrow="ALWAYS"/>
+    <HBox>
+        <CheckBox text="Match case" fx:id="matchCaseCB"/>
+        <Pane HBox.hgrow="ALWAYS"/>
+        <Button text="Search" onAction="#searchDown"/>
+    </HBox>
+</VBox>

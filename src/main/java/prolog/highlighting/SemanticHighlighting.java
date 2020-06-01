@@ -26,6 +26,7 @@ import ru.prolog.syntaxmodel.tree.semantics.SemanticAnalyzer;
 import ru.prolog.syntaxmodel.tree.semantics.SemanticInfo;
 import ru.prolog.syntaxmodel.tree.semantics.attributes.*;
 import ru.prolog.syntaxmodel.tree.semantics.attributes.errors.AbstractSemanticError;
+import ru.prolog.syntaxmodel.tree.semantics.attributes.errors.DuplicateError;
 import ru.prolog.syntaxmodel.tree.semantics.attributes.warnings.AbstractSemanticWarning;
 import ru.prolog.util.NameChecker;
 
@@ -47,11 +48,6 @@ public class SemanticHighlighting implements Highlighter {
     }
 
     @Override
-    public HighlightingResult computeHighlighting(String text) {
-        return new HighlightingResult(0, computeHighlightingFull(text));
-    }
-
-    @Override
     public StyleSpans<Collection<String>> computeHighlightingFull(String text) {
         if(goToWindow != null) {
             goToWindow.close();
@@ -67,6 +63,11 @@ public class SemanticHighlighting implements Highlighter {
         semanticAnalyzer = new SemanticAnalyzer(treeRoot);
         semanticAnalyzer.performSemanticAnalysis();
         return buildStyleSpans(lexer);
+    }
+
+    @Override
+    public HighlightingResult computeHighlighting(String text) {
+        return new HighlightingResult(0, computeHighlightingFull(text));
     }
 
     private StyleSpans<Collection<String>> buildStyleSpans(Lexer lexer) {
@@ -297,6 +298,17 @@ public class SemanticHighlighting implements Highlighter {
         NameOf nameAttr = token.getSemanticInfo().getAttribute(NameOf.class);
         if(nameAttr != null) {
             Node namedNode = nameAttr.getNamedNode();
+
+            DuplicateError duplicateError = namedNode.getSemanticInfo().getAttribute(DuplicateError.class);
+            if(duplicateError != null && duplicateError.getDuplicate() != null) {
+                MenuItem goToDuplicate = new MenuItem("Go to duplicate");
+                goToDuplicate.setOnAction(event -> {
+                    codeArea.moveTo(duplicateError.getDuplicate().startPos());
+                    codeArea.requestFollowCaret();
+                });
+                menuItems.add(goToDuplicate);
+            }
+
             ToDeclaration toDeclaration = namedNode.getSemanticInfo().getAttribute(ToDeclaration.class);
             if (toDeclaration != null) {
                 Node declaration = toDeclaration.getDeclaration();
@@ -399,7 +411,8 @@ public class SemanticHighlighting implements Highlighter {
         if (foundNodes.size() == 1) {
             Node singleResult = foundNodes.iterator().next();
             menuItem.setOnAction(event -> {
-                codeArea.moveTo(singleResult.startPos());
+                int startPos = singleResult.startPos();
+                codeArea.selectRange(startPos, startPos + singleResult.firstToken().length());
                 codeArea.requestFollowCaret();
             });
         } else {
@@ -435,11 +448,17 @@ public class SemanticHighlighting implements Highlighter {
             CodeArea line = new CodeArea();
             line.setEditable(false);
             VBox.setVgrow(line, Priority.NEVER);
-            line.setParagraphGraphicFactory(n->new Label(lineNumber + ":"));
+            line.setParagraphGraphicFactory(n->new Label(lineNumber+1 + ":"));
             line.setMaxHeight(30);
             line.getStylesheets().addAll(codeArea.getStylesheets());
             line.append(styledLine);
             layout.getChildren().add(line);
+            line.setOnMouseEntered(event -> line.setStyle("-fx-border-width: 1px; -fx-border-color: black; -fx-cursor: hand;"));
+            line.setOnMouseExited(event -> line.setStyle("-fx-border-width: 0px; -fx-cursor: default;"));
+            int lineStartPos = codeArea.position(lineNumber, 0).toOffset();
+            int nodeSatrt = result.startPos();
+            int posInLine = nodeSatrt - lineStartPos;
+            line.setStyle(posInLine, posInLine + result.firstToken().length(), Arrays.asList("onCursor", "usage"));
 
             line.setOnMouseClicked(event -> {
                 int startPos = result.startPos();
@@ -473,7 +492,7 @@ public class SemanticHighlighting implements Highlighter {
         List<Token> usages = new ArrayList<>(variablesHolder.byName(name));
         if(variablesHolder instanceof StatementSetVariablesHolder) {
             RuleLeftVariablesHolder ruleLeftVariablesHolder = ((StatementSetVariablesHolder) variablesHolder).getRuleLeftVariablesHolder();
-            usages.addAll(ruleLeftVariablesHolder.byName(name));
+            if(ruleLeftVariablesHolder != null) usages.addAll(ruleLeftVariablesHolder.byName(name));
         } else if(variablesHolder instanceof RuleLeftVariablesHolder) {
             for (StatementSetVariablesHolder statementSetVariablesHolder : ((RuleLeftVariablesHolder) variablesHolder).getStatementSetVariablesHolders()) {
                 usages.addAll(statementSetVariablesHolder.byName(name));

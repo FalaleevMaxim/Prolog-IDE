@@ -1,13 +1,18 @@
 package prolog;
 
-import javafx.application.Platform;
 import javafx.concurrent.Service;
 import javafx.concurrent.Task;
 import javafx.event.ActionEvent;
+import javafx.fxml.FXMLLoader;
 import javafx.fxml.Initializable;
 import javafx.geometry.Point2D;
+import javafx.scene.Parent;
+import javafx.scene.Scene;
 import javafx.scene.control.*;
-import javafx.scene.input.*;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyCodeCombination;
+import javafx.scene.input.KeyCombination;
+import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
 import javafx.stage.Popup;
@@ -40,7 +45,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.OptionalInt;
 import java.util.ResourceBundle;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 @SuppressWarnings("StatementWithEmptyBody")
@@ -78,6 +82,7 @@ public class Controller implements Initializable {
     private Highlighter highlighter = new LexerHighlighting();
     private Subscription updateHighlightSubscription;
     private volatile boolean textChanged;
+    private Stage searchWindow;
 
     public File getFile() {
         if (!fileSaved) saveFile();
@@ -327,7 +332,7 @@ public class Controller implements Initializable {
         codeArea.caretPositionProperty().addListener((observable, oldValue, newValue) -> updateCaretPos(newValue));
         codeArea.setParagraphGraphicFactory(LineNumberFactory.get(codeArea));
         final Pattern whiteSpace = Pattern.compile("^\\s+");
-        codeArea.addEventHandler(KeyEvent.KEY_PRESSED, KE ->
+/*        codeArea.addEventHandler(KeyEvent.KEY_PRESSED, KE ->
         {
             if (KE.getCode() == KeyCode.ENTER) {
                 int caretPosition = codeArea.getCaretPosition();
@@ -335,7 +340,7 @@ public class Controller implements Initializable {
                 Matcher m0 = whiteSpace.matcher(codeArea.getParagraph(currentParagraph - 1).getSegments().get(0));
                 if (m0.find()) Platform.runLater(() -> codeArea.insertText(caretPosition, m0.group()));
             }
-        });
+        });*/
 
         subscribeHighlighter(500);
         codeArea.getStylesheets().add(getClass().getResource("/editor.css").toExternalForm());
@@ -387,6 +392,27 @@ public class Controller implements Initializable {
                 InputMap.consume(
                         EventPattern.keyPressed(KeyCode.D, KeyCombination.CONTROL_DOWN),
                         e -> duplicateLine())));
+        Nodes.addInputMap(codeArea, InputMap.sequence(
+                InputMap.consume(
+                        EventPattern.keyPressed(KeyCode.F, KeyCombination.CONTROL_DOWN),
+                        e -> {
+                            try {
+                                if(searchWindow == null) {
+                                    FXMLLoader loader = new FXMLLoader(getClass().getResource("/SearchDialog.fxml"));
+                                    Parent root = loader.load();
+                                    searchWindow = new Stage();
+                                    searchWindow.setTitle("Search");
+                                    searchWindow.setScene(new Scene(root));
+                                    SearchDialogController controller = loader.getController();
+                                    controller.setCodeArea(codeArea);
+                                } else {
+                                    searchWindow.show();
+                                }
+                                searchWindow.show();
+                            } catch (Exception ignored) {
+
+                            }
+                        })));
         Nodes.addInputMap(codeArea, InputMap.sequence(
                 InputMap.consume(
                         EventPattern.keyPressed(KeyCode.DELETE, KeyCombination.SHIFT_DOWN),
@@ -490,8 +516,8 @@ public class Controller implements Initializable {
         for (i = lineStart; i < text.length() && text.charAt(i) != '\r' && text.charAt(i) != '\n'; i++) ;
         if (i < text.length() && text.charAt(i) == '\r') i++;
         if (i < text.length() && text.charAt(i) == '\n') i++;
-        String line = text.substring(lineStart, i);
-        codeArea.deleteText(lineStart, i);
+        codeArea.selectRange(lineStart, i);
+        codeArea.cut();
         codeArea.moveTo(caretPosition);
     }
 
@@ -580,5 +606,6 @@ public class Controller implements Initializable {
 
     public void close() {
         highlighter.close();
+        if(searchWindow != null)  searchWindow.close();
     }
 }
