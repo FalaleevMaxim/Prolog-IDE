@@ -1,5 +1,6 @@
 package prolog;
 
+import javafx.application.Platform;
 import javafx.concurrent.Service;
 import javafx.concurrent.Task;
 import javafx.event.ActionEvent;
@@ -20,6 +21,7 @@ import javafx.stage.Stage;
 import org.fxmisc.richtext.CodeArea;
 import org.fxmisc.richtext.LineNumberFactory;
 import org.fxmisc.richtext.event.MouseOverTextEvent;
+import org.fxmisc.richtext.model.StyleSpans;
 import org.fxmisc.wellbehaved.event.EventPattern;
 import org.fxmisc.wellbehaved.event.InputMap;
 import org.fxmisc.wellbehaved.event.Nodes;
@@ -370,12 +372,15 @@ public class Controller implements Initializable {
 
         codeArea.caretPositionProperty().addListener((observable, oldValue, newValue) -> {
             if (textChanged) return;
-            List<Highlighter.HighlightingResult> results = highlighter.changeStylesOnCursor(newValue);
-            if (results != null) {
-                for (Highlighter.HighlightingResult result : results) {
-                    codeArea.setStyleSpans(result.start, result.styleSpans);
+            if(codeArea.getSelection().getLength() > 0) return;
+            Platform.runLater(()->{
+                List<Highlighter.HighlightingResult> results = highlighter.changeStylesOnCursor(newValue);
+                if (results != null) {
+                    for (Highlighter.HighlightingResult result : results) {
+                        codeArea.setStyleSpans(result.start, result.styleSpans);
+                    }
                 }
-            }
+            });
         });
         codeArea.setOnContextMenuRequested(event -> {
             codeArea.hideContextMenu();
@@ -488,9 +493,13 @@ public class Controller implements Initializable {
 
                 // run the following code block when previous stream emits an event
                 .subscribe(ignore -> {
-                    Highlighter.HighlightingResult highlightingResult = highlighter.computeHighlighting(codeArea.getText());
-                    codeArea.setStyleSpans(highlightingResult.start, highlightingResult.styleSpans);
-                    textChanged = false;
+                    Platform.runLater(()->{
+                        Highlighter.HighlightingResult highlightingResult = highlighter.computeHighlighting(codeArea.getText());
+                        if(highlightingResult.styleSpans != null) {
+                            codeArea.setStyleSpans(highlightingResult.start, highlightingResult.styleSpans);
+                        }
+                        textChanged = false;
+                    });
                 });
     }
 
@@ -539,7 +548,8 @@ public class Controller implements Initializable {
     }
 
     public void updateHighlighting() {
-        codeArea.setStyleSpans(0, highlighter.computeHighlightingFull(codeArea.getText()));
+        StyleSpans<Collection<String>> styleSpans = highlighter.computeHighlightingFull(codeArea.getText());
+        if(styleSpans != null) codeArea.setStyleSpans(0, styleSpans);
         textChanged = false;
     }
 

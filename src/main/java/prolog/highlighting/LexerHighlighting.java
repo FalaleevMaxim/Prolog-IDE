@@ -32,7 +32,12 @@ public class LexerHighlighting implements Highlighter {
 
     @Override
     public HighlightingResult computeHighlighting(String text) {
-        if (text.isEmpty()) return new HighlightingResult(0, StyleSpans.singleton(Collections.emptyList(), 0));
+        if (text.isEmpty()) {
+            firstToken = null;
+            lastToken  =null;
+            lastParsedCode = text;
+            return new HighlightingResult(0, StyleSpans.singleton(Collections.emptyList(), 0));
+        }
 
         ChangedCode changed = computeChange(text);
         Lexer lexer = getLexerForChangedText(text, changed);

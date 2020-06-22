@@ -36,6 +36,7 @@ public class ParserHighlighting implements Highlighter {
         Lexer lexer = new Lexer(text);
         treeRoot = new ProgramNode(null);
         treeRoot.parse(lexer);
+        if(text.isEmpty()) return null;
         collectNodeErrors(treeRoot);
         return buildStyleSpans(lexer);
     }

@@ -21,11 +21,13 @@ import ru.prolog.syntaxmodel.tree.interfaces.Bracketed;
 import ru.prolog.syntaxmodel.tree.interfaces.Named;
 import ru.prolog.syntaxmodel.tree.interfaces.Separated;
 import ru.prolog.syntaxmodel.tree.misc.NodeError;
+import ru.prolog.syntaxmodel.tree.nodes.FunctorDefNode;
 import ru.prolog.syntaxmodel.tree.nodes.modules.ProgramNode;
 import ru.prolog.syntaxmodel.tree.semantics.SemanticAnalyzer;
 import ru.prolog.syntaxmodel.tree.semantics.SemanticInfo;
 import ru.prolog.syntaxmodel.tree.semantics.attributes.*;
 import ru.prolog.syntaxmodel.tree.semantics.attributes.errors.AbstractSemanticError;
+import ru.prolog.syntaxmodel.tree.semantics.attributes.errors.DeclarationNotFoundError;
 import ru.prolog.syntaxmodel.tree.semantics.attributes.errors.DuplicateError;
 import ru.prolog.syntaxmodel.tree.semantics.attributes.warnings.AbstractSemanticWarning;
 import ru.prolog.util.NameChecker;
@@ -62,6 +64,7 @@ public class SemanticHighlighting implements Highlighter {
         collectNodeErrors(treeRoot);
         semanticAnalyzer = new SemanticAnalyzer(treeRoot);
         semanticAnalyzer.performSemanticAnalysis();
+        if(text.isEmpty()) return null;
         return buildStyleSpans(lexer);
     }
 
@@ -309,12 +312,23 @@ public class SemanticHighlighting implements Highlighter {
                 menuItems.add(goToDuplicate);
             }
 
+            DeclarationNotFoundError declarationNotFoundError = namedNode.getSemanticInfo().getAttribute(DeclarationNotFoundError.class);
+            if (declarationNotFoundError != null) {
+                List<FunctorDefNode> possibleDeclarations = declarationNotFoundError.getPossibleDeclarations();
+                if (!possibleDeclarations.isEmpty()) {
+                    addFindAction(menuItems, new HashSet<>(possibleDeclarations),
+                            "Go to possible declarations of " + token.getText(),
+                            "Declarations of " + token.getText());
+                }
+            }
+
             ToDeclaration toDeclaration = namedNode.getSemanticInfo().getAttribute(ToDeclaration.class);
             if (toDeclaration != null) {
                 Node declaration = toDeclaration.getDeclaration();
                 MenuItem goToDeclaration = new MenuItem("Go to declaration");
                 goToDeclaration.setOnAction(event -> {
-                    codeArea.moveTo(declaration.startPos());
+                    int startPos = declaration.startPos();
+                    codeArea.selectRange(startPos, startPos + declaration.firstToken().length());
                     codeArea.requestFollowCaret();
                 });
                 menuItems.add(goToDeclaration);

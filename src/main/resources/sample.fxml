@@ -46,14 +46,14 @@
                 <RadioMenuItem text="No highlighting"
                                fx:id="noHighlightingMenuItem"
                                toggleGroup="$highlightingToggleGroup"/>
-                <RadioMenuItem text="Use lexer"
+                <RadioMenuItem text="Tokens"
                                fx:id="lexerHighlightingMenuItem"
                                selected="true"
                                toggleGroup="$highlightingToggleGroup"/>
-                <RadioMenuItem text="Use parser"
+                <RadioMenuItem text="Parse tree"
                                fx:id="parserHighlightingMenuItem"
                                toggleGroup="$highlightingToggleGroup"/>
-                <RadioMenuItem text="Use semantic analyzer"
+                <RadioMenuItem text="Semantic"
                                fx:id="semanticHighlightingMenuItem"
                                toggleGroup="$highlightingToggleGroup"/>
             </Menu>
