@@ -10,10 +10,7 @@ import javafx.geometry.Point2D;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
-import javafx.scene.input.KeyCode;
-import javafx.scene.input.KeyCodeCombination;
-import javafx.scene.input.KeyCombination;
-import javafx.scene.input.MouseEvent;
+import javafx.scene.input.*;
 import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
 import javafx.stage.Popup;
@@ -47,6 +44,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.OptionalInt;
 import java.util.ResourceBundle;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 @SuppressWarnings("StatementWithEmptyBody")
@@ -334,15 +332,17 @@ public class Controller implements Initializable {
         codeArea.caretPositionProperty().addListener((observable, oldValue, newValue) -> updateCaretPos(newValue));
         codeArea.setParagraphGraphicFactory(LineNumberFactory.get(codeArea));
         final Pattern whiteSpace = Pattern.compile("^\\s+");
-/*        codeArea.addEventHandler(KeyEvent.KEY_PRESSED, KE ->
+        codeArea.addEventHandler( KeyEvent.KEY_PRESSED, KE ->
         {
-            if (KE.getCode() == KeyCode.ENTER) {
-                int caretPosition = codeArea.getCaretPosition();
-                int currentParagraph = codeArea.getCurrentParagraph();
-                Matcher m0 = whiteSpace.matcher(codeArea.getParagraph(currentParagraph - 1).getSegments().get(0));
-                if (m0.find()) Platform.runLater(() -> codeArea.insertText(caretPosition, m0.group()));
+            if ( KE.getCode() == KeyCode.ENTER ) {
+                Platform.runLater(()->{
+                    int caretPosition = codeArea.getCaretPosition();
+                    int currentParagraph = codeArea.getCurrentParagraph();
+                    Matcher m0 = whiteSpace.matcher( codeArea.getParagraph( currentParagraph-1 ).getSegments().get( 0 ) );
+                    if ( m0.find() ) codeArea.insertText( caretPosition, m0.group() );
+                });
             }
-        });*/
+        });
 
         subscribeHighlighter(500);
         codeArea.getStylesheets().add(getClass().getResource("/editor.css").toExternalForm());
